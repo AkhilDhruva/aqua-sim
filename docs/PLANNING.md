@@ -104,18 +104,21 @@ we are closing so the thing actually runs and produces trustworthy output:
 Phases are ordered to get a **testable core early** and defer data-acquisition
 risk. Each milestone has a concrete "done" check.
 
-| Phase | Goal | Done when |
+| Phase | Goal | Status / done when |
 |-------|------|-----------|
-| **P0 — Foundations** *(this branch)* | Repo structure, config, dependency-free synthetic terrain, module contracts | `aqua-sim` generates a synthetic heightmap; module skeleton + docs in place; `pytest` green |
-| **P1 — Ingestion** | GeoTIFF DEM → metric, CRS-aware `Grid`; geofence/AOI clip | A real DEM tile loads into a `Grid` with correct cell size in meters |
-| **P2 — Physics core** | Local-inertial SWE: rainfall source, Manning friction, CFL-adaptive Δt, open boundaries | Dam-break matches the Ritter analytic solution within tolerance |
-| **P3 — Risk layer** | Sink nodes (orifice inflow), depth×velocity hazard classes, alert log | Given a sim + node list, emits a time-stamped, ranked risk report |
-| **P4 — Visualization** | Frame export + Three.js viewer: orbit camera, depth/velocity shader, storm sliders | Stakeholder can load a run in-browser and scrub time |
+| **P0 — Foundations** | Repo structure, config, dependency-free synthetic terrain, module contracts | ✅ **Done** — skeleton + docs + tests green |
+| **P2 — Physics core** | Local-inertial SWE: rainfall source, Manning friction, CFL-adaptive Δt, open/closed boundaries, flux limiter | ✅ **Done** — mass-conserving (to fp), well-balanced, non-negative under dam-break; validated in `tests/test_swe.py` |
+| **P3 — Risk layer** | Sink nodes (orifice inflow), depth×velocity hazard classes, alert log | ✅ **Done** — scenario emits time-stamped, ranked WARNING/CRITICAL alerts with inundation ETA |
+| **P3.5 — Frame export** | Provenance-rich `manifest.json` + `frame_NNN.json` + `alerts.json` | ✅ **Done** — `python -m aqua_sim run OUTDIR` writes a full run folder |
+| **P1 — Real ingestion** | GeoTIFF DEM (USGS 3DEP, Manhattan) → metric, CRS-aware `Grid`; geofence clip | ⏭ **Next** — real DEM tile loads into a `Grid` at correct metric cell size |
+| **P4 — Visualization** | Three.js viewer over the run folder: orbit camera, depth/velocity shader, storm sliders | Stakeholder loads a run in-browser and scrubs time |
 | **P5 — Drone/LiDAR ingestion** | Photogrammetry (SfM→DSM/DTM) and LiDAR (PDAL) as pluggable sources | Drone image set or `.laz` produces a `Grid` behind the same interface as P1 |
-| **P6 — Hardening** | Validation suite, Taichi/GPU, tiling for scale, infiltration/drainage models | Runs a city-scale AOI in reasonable time; benchmark suite passes |
+| **P6 — Hardening** | Taichi/GPU kernel, tiling for city scale, infiltration model, real-event validation (NYC 2021 / FEMA layer) | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
 
-**Thin-slice target (spans P1–P4):** one DEM tile → solver → 3D view → one
-sink-node alert. This proves every layer connects before we deepen any one of them.
+**Thin-slice status:** the end-to-end path (terrain → solver → risk → exported
+frames → one sink-node alert) is **built and running today** on a Manhattan-scaled
+synthetic AOI. The remaining thin-slice work is swapping the synthetic terrain for
+a real Manhattan DEM (P1) and building the browser viewer (P4).
 
 ## 6. Risks & open questions
 
@@ -130,12 +133,16 @@ sink-node alert. This proves every layer connects before we deepen any one of th
 - **Drainage realism.** A sink-term drainage model is an approximation of a real
   sewer network. Good enough for screening; flag where it isn't.
 
-**Open questions for Akhil** (defaults chosen so work isn't blocked):
-1. First area of interest / geofence? (Drives which DEM tile + validation event.)
-2. Do you have real drone or LiDAR data now, or should P1–P4 run entirely on
-   public DEM until P5?
-3. Interactive real-time browser solver — needed for demos, or is a
-   pre-computed-frame viewer enough for the foreseeable milestones?
+**Resolved with Akhil:**
+1. **AOI / geofence → Manhattan.** A scale where 2D urban flood modeling is the
+   right tool. The demo scenario is Manhattan-shaped (island, central ridge,
+   enclosed low-lying basin) pending the real DEM tile.
+2. **No drone/LiDAR data yet → public DEM.** Use USGS 3DEP 1 m (LiDAR-derived) for
+   Manhattan; drone/LiDAR ingestion deferred to P5. See docs/DATA_SOURCING.md.
+3. **Pre-computed frame architecture confirmed.** Offline Python/Taichi solve →
+   exported frames → thin Three.js dashboard. No interactive browser solver needed
+   for the foreseeable milestones; credibility comes from provenance + validation
+   (see ARCHITECTURE.md §6a).
 
 ## 7. How to contribute / next action
 

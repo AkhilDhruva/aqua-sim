@@ -187,6 +187,55 @@ A run exports:
 Keeping this an explicit, versioned format is what lets the solver and viewer
 evolve independently.
 
+## 6a. The pre-computed (offline-solve) architecture
+
+This is the deliberate, load-bearing design choice: **the physics runs offline on
+a Python/Taichi backend and exports frames; the browser is a thin telemetry
+dashboard over those frames.** It is not a shortcut — it is how every serious
+flood model operates (HEC-RAS, TUFLOW, LISFLOOD-FP all solve offline and
+visualize results). The benefits:
+
+- **Fidelity without browser limits.** The backend can run a fine grid over a long
+  storm for as long as it needs, unconstrained by a browser tab's memory or a
+  frame budget. The viewer never does physics, so it stays instant.
+- **Reproducibility = authority.** Every run writes a `manifest.json` provenance
+  block (data source, resolution, CRS, solver scheme, storm/solver parameters).
+  A reviewer can trace any displayed result back to its exact inputs and rerun it.
+  This — not compute time itself — is what makes the model *defensible* to a
+  technical audience (city planners, emergency managers, infrastructure agencies).
+- **Separation of concerns.** Solver and viewer evolve independently across a
+  versioned file format (§6). The solver can be rewritten (NumPy → Taichi/GPU)
+  with zero viewer changes.
+
+What makes the *science* strong (the parts reviewers actually probe):
+
+1. **A named, published scheme** — local-inertial SWE (Bates et al. 2010), the
+   documented standard for 2D urban flood modeling, not an ad-hoc heuristic.
+2. **Enforced invariants** — mass conservation and well-balancedness (lake-at-rest)
+   are unit-tested (`tests/test_swe.py`), and a flux limiter guarantees
+   non-negative depths even under a violent dam-break. These are the first things
+   a numerical reviewer checks.
+3. **CFL-adaptive timestepping** — stability is guaranteed by construction, not by
+   luck.
+4. **Real terrain + provenance** — results are tied to a specific public DEM tile
+   with recorded resolution/CRS/datum (see docs/DATA_SOURCING.md).
+5. **Benchmark validation** — analytic cases now; a recorded event (e.g. NYC 2021)
+   and the FEMA flood layer as the AOI validation target.
+
+### The end-to-end thin slice (implemented)
+
+The `scenario` module already runs the full path today:
+
+```
+build terrain (Grid)  ->  ShallowWaterSolver.run()  ->  per-frame risk eval
+     ->  write_run():  manifest.json + terrain.json + frame_001..NNN.json + alerts.json
+```
+
+Run it: `python -m aqua_sim run OUTDIR`. The Three.js viewer (Phase 4) will load
+`terrain.json` once for the static mesh, then cycle `frame_NNN.json`, updating the
+water surface and surfacing `alerts.json` entries as their timestamps are reached
+— exactly the "supercomputing model, browser as dashboard" split.
+
 ## 7. Technology stack
 
 | Concern | Choice | Notes |

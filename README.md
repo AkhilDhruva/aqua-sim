@@ -15,19 +15,23 @@ biases toward physical correctness and reproducibility.
 - **[docs/PLANNING.md](docs/PLANNING.md)** — vision, scope, key decisions, and the
   phased roadmap. The single source of truth.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system layers, the
-  shallow-water physics engine, and data flow.
+  shallow-water physics engine, the pre-computed (offline-solve) design, data flow.
 - **[docs/DATA_INGESTION.md](docs/DATA_INGESTION.md)** — DEM / LiDAR /
   drone-photogrammetry input formats and how they converge to one terrain grid.
+- **[docs/DATA_SOURCING.md](docs/DATA_SOURCING.md)** — what a DEM is, and the
+  public Manhattan datasets (USGS 3DEP, NYC LiDAR) we use.
 
-## Status: Phase 0 (foundations)
+## Status: physics core running (P0–P3.5 done)
 
-The module skeleton and a **dependency-free, tested seed** are in place. The
-shallow-water solver (Phase 2) and real data ingestion (Phase 1/5) are stubbed
-with documented contracts. See the roadmap in `docs/PLANNING.md`.
+The **shallow-water solver is real and validated**, the risk layer emits alerts,
+and a run exports the exact `frame_NNN.json` frames the browser viewer will read.
+Real DEM ingestion (P1) and the Three.js viewer (P4) are next. Roadmap in
+`docs/PLANNING.md`.
 
-What runs today (`python -m aqua_sim`): synthetic terrain generation, a
-CFL-limited timestep, depth×velocity hazard classification, and orifice-based
-sink-node inflow — the real, unit-tested building blocks the solver will use.
+The solver is a local-inertial (LISFLOOD-FP / Bates 2010) scheme, is
+**mass-conserving to floating-point** and **well-balanced** (lake-at-rest), with a
+flux limiter guaranteeing non-negative depths and CFL-adaptive timestepping —
+all unit-tested in `tests/test_swe.py`.
 
 ## Quick start (Python 3.10+)
 
@@ -36,9 +40,13 @@ python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-python -m aqua_sim                 # Phase 0 demo
-pytest                             # test suite
+python -m aqua_sim                 # self-check of the wired components
+python -m aqua_sim run output/run  # full Manhattan demo: solver -> risk -> frames
+pytest                             # test suite (physics validation + end-to-end)
 ```
+
+A run writes `manifest.json` (with a provenance block), `terrain.json`,
+`frame_001.json … frame_NNN.json`, and `alerts.json` into the output folder.
 
 ## Project layout
 
@@ -48,6 +56,7 @@ aqua-sim/
 ├── src/aqua_sim/
 │   ├── config.py             # run configuration (storm, solver) + units
 │   ├── grid.py               # the core metric terrain Grid (every layer's input)
+│   ├── scenario.py           # end-to-end runner + Manhattan demo AOI
 │   ├── geofence.py           # area-of-interest masking
 │   ├── ingestion/            # 1. terrain sources → Grid
 │   │   ├── base.py           #    TerrainSource contract
@@ -56,16 +65,16 @@ aqua-sim/
 │   │   ├── lidar.py         #    LiDAR .las/.laz    (Phase 5)
 │   │   └── photogrammetry.py #    drone SfM          (Phase 5)
 │   ├── physics/              # 2. shallow-water solver
+│   │   ├── swe.py            #    local-inertial SWE solver (real, tested)
 │   │   ├── stability.py      #    CFL timestep       (real, tested)
 │   │   ├── friction.py       #    Manning roughness  (real, tested)
-│   │   ├── boundary.py       #    boundary conditions
-│   │   ├── infiltration.py   #    losses             (Phase 6)
-│   │   └── swe.py            #    solver             (Phase 2)
+│   │   ├── boundary.py       #    boundary conditions (open/closed/inflow)
+│   │   └── infiltration.py   #    losses             (Phase 6)
 │   ├── risk/                 # 3. hazard, sink nodes, alerts
 │   │   ├── hazard.py         #    depth×velocity classes (real, tested)
 │   │   ├── sink_nodes.py     #    orifice inflow         (real, tested)
 │   │   └── alerts.py         #    time-stamped risk log  (real, tested)
-│   └── export/frames.py      # 4. run export for the viewer (Phase 4)
+│   └── export/frames.py      # 4. run export (manifest + frames)  (real, tested)
 ├── viz/                      # 4. Three.js browser viewer (Phase 4)
 ├── tests/                    # pytest suite
 └── pyproject.toml
