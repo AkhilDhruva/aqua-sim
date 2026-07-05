@@ -152,6 +152,26 @@ Q_in = Cd · A · √( 2·g·(H_surface − z_threshold) )      capped by node c
 This gives a credible *fill time* ("Transit Node 4 fully inundated in ~14 min")
 instead of an instantaneous, physically meaningless dump.
 
+**Defining a "breach" mathematically.** A breach is *not* "there is water at the
+node cell." Raw depth is the wrong trigger — a 1 cm film over a high entrance is
+harmless, while the same depth at a low entrance is a flood. The correct,
+defensible criterion is a **hydraulic head over the entrance lip**, evaluated by
+the solver (not the viewer):
+
+    η = z_bed + h                 (local water-surface elevation)
+    head H = η − z_threshold      (z_threshold = elevation of the entrance lip)
+    BREACH  ⇔  h > min_depth  AND  H > ε          (ε ≈ 0.02 m, a physical margin)
+
+The `min_depth` guard rejects numerically thin films; the `ε` margin rejects
+sub-centimeter noise around the lip so the trigger is deterministic, not chattery.
+On breach the solver emits the orifice discharge `Q = Cd·A·√(2gH)` (capped by
+capacity) and accumulates `∫Q dt` toward the node's storage, tracking
+`fraction_full`. A *warning* fires earlier, when `H ≥ −0.15 m` (water within
+15 cm below the lip). Severity thus escalates on physical state, not on frame
+count: **approaching lip → WARNING; head above lip → CRITICAL breach with an
+inundation rate and ETA.** Every breach is written into the frame where it occurs
+(see §6), so a frame is self-contained evidence of the event.
+
 ### 4.3 Alert log / risk matrix
 
 Time-stamped, severity-ranked events driven by thresholds:
@@ -178,11 +198,21 @@ Output as structured data (JSON) so both the viewer and reports consume it.
 A run exports:
 - `manifest.json` — grid metadata (CRS, transform, dx, extent), time axis, units,
   provenance, list of frame files, sink-node definitions.
-- `frame_XXXX` — per-timestep depth (and optionally velocity) fields. Format TBD
-  in P4: compact binary (`.npz` / typed-array `.bin`) for size, with a JSON
-  fallback for small grids. Depth is the minimum; velocity enables the hazard
-  shader.
-- `alerts.json` — the time-stamped risk log.
+- `terrain.json` — static bed elevation + obstacle (building) heights, loaded once.
+- `frame_001.json … frame_NNN.json` — per-timestep water depth, peak stats, an
+  embedded **provenance header** (`run_id` + generation parameters), and the list
+  of active **breaches** for that instant (`{breach_detected, node_id, head_m,
+  inundation_rate_m3_s, cumulative_volume_m3, fraction_full}`). A frame is never
+  separable from how it was produced. (A later phase can swap the JSON body for a
+  compact typed-array `.bin` without changing the schema — the format is versioned.)
+- `alerts.json` — the time-stamped, severity-ranked risk log (first-crossing events).
+
+**Provenance & determinism.** The manifest carries a full `provenance` block (data
+source, resolution, CRS, solver scheme, Manning value, storm & solver parameters)
+and a `run_id` — a SHA-256 content hash of that block. Identical inputs produce an
+identical `run_id`, so anyone can recompute a run and confirm they got the same
+frames. This is what "deterministically derived" means in practice, and it is the
+honest alternative to a wall-clock stamp or a decorative signature.
 
 Keeping this an explicit, versioned format is what lets the solver and viewer
 evolve independently.

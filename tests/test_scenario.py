@@ -48,13 +48,44 @@ def test_run_scenario_writes_frames_and_manifest(tmp_path):
     frame = json.load(open(os.path.join(run_dir, last)))
     assert len(frame["depth"]) == 12 and len(frame["depth"][0]) == 12
 
+    # Each frame carries a provenance header tying it to the run, plus a breach list.
+    assert "run_id" in manifest and len(manifest["run_id"]) == 16
+    assert frame["provenance"]["run_id"] == manifest["run_id"]
+    assert frame["provenance"]["rainfall_mm_per_hr"] == 120.0
+    assert isinstance(frame["breaches"], list)
+
+
+def test_run_id_is_deterministic(tmp_path):
+    # Same configuration -> identical run_id (deterministically derived).
+    from aqua_sim.physics import BoundaryType
+    grid = Grid.empty(8, 8, 10.0)
+    node = SinkNode("N", 4, 4, threshold_elevation=0.05, opening_area_m2=1.0)
+    cfg = SimConfig(
+        storm=StormConfig(rainfall_mm_per_hr=60.0, duration_hours=1.0,
+                          drainage_capacity_mm_per_hr=0.0),
+        solver=SolverConfig(total_time_s=300.0, output_interval_s=150.0),
+        aoi_name="det-test",
+    )
+    m1 = run_scenario(Scenario(grid, cfg, [node], BoundaryType.CLOSED), str(tmp_path / "a"))
+    m2 = run_scenario(Scenario(Grid.empty(8, 8, 10.0), cfg, [node], BoundaryType.CLOSED),
+                      str(tmp_path / "b"))
+    assert m1["run_id"] == m2["run_id"]
+
 
 def test_scenario_triggers_sink_node_alert():
     sc = build_manhattan_demo()
     import tempfile
     with tempfile.TemporaryDirectory() as d:
-        run_scenario(sc, d)
+        man = run_scenario(sc, d)
         alerts = json.load(open(os.path.join(d, "alerts.json")))
+        # At least one frame embeds a solver-side breach object.
+        breached_frames = [fr for fr in man["frames"] if fr["breach_count"] > 0]
+        assert breached_frames
+        frame = json.load(open(os.path.join(d, breached_frames[-1]["file"])))
+        ev = frame["breaches"][0]
+        assert ev["breach_detected"] is True
+        assert ev["inundation_rate_m3_s"] > 0
+        assert "node_id" in ev and "head_m" in ev
     assert any(a["severity"] == "CRITICAL" for a in alerts)
     # Critical is ranked ahead of warning.
     assert alerts[0]["severity"] == "CRITICAL"

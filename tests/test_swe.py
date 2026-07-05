@@ -60,6 +60,24 @@ def test_rainfall_adds_expected_volume():
     assert abs(states[-1].total_volume_m3 - 250.0) < 1e-6
 
 
+def test_obstacle_wall_blocks_flow():
+    # A full column of building/obstacle cells splits the domain; water released on
+    # the left must not cross to the right (DTM flow surface, DSM buildings = walls).
+    grid = Grid.empty(21, 8, 5.0, default_manning=0.02)
+    wall_x = 10
+    for y in range(8):
+        grid.obstacle[y][wall_x] = 30.0  # a 30 m building — impassable
+    solver = ShallowWaterSolver(grid, _closed_cfg(600, 300), boundary=BoundaryType.CLOSED)
+    init = [[0.0] * 21 for _ in range(8)]
+    for y in range(8):
+        for x in range(0, wall_x):
+            init[y][x] = 1.0  # water only on the left of the wall
+    states = list(solver.run(initial_depth=init))
+    right_water = sum(states[-1].depth[y][x]
+                      for y in range(8) for x in range(wall_x + 1, 21))
+    assert right_water == 0.0  # nothing leaked past the wall
+
+
 def test_open_boundary_drains_water():
     grid = Grid.empty(16, 16, 5.0)
     for y in range(16):
