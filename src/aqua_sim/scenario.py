@@ -263,6 +263,9 @@ def run_scenario(scenario: Scenario, run_dir: str) -> dict:
             scanner.scan(state)  # appends this frame's breaches before export reads them
             yield state
 
+    nodes = [{"name": n.name, "x": n.x, "y": n.y,
+              "threshold_elevation": round(n.threshold_elevation, 3)}
+             for n in scenario.nodes]
     return write_run(run_dir, scenario.grid, stream(), scenario.config,
                      alerts=scanner.records,  # evaluated after the last frame
-                     frame_breaches=scanner.frame_breaches)
+                     frame_breaches=scanner.frame_breaches, nodes=nodes)

@@ -86,6 +86,7 @@ def write_run(
     config: SimConfig,
     alerts: Union[list[dict], Callable[[], list[dict]], None] = None,
     frame_breaches: list[list[dict]] | None = None,
+    nodes: list[dict] | None = None,
 ) -> dict:
     """Serialize a completed run to ``run_dir``. Returns the manifest dict.
 
@@ -192,6 +193,7 @@ def write_run(
             "depth_critical_m": DEPTH_CRITICAL_M,
         },
         "provenance": provenance,
+        "nodes": nodes or [],  # sink-node positions so the viewer can mark them
         "frames": frame_records,
         "alerts_file": "alerts.json",
     }

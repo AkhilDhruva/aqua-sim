@@ -27,6 +27,7 @@ export const THRESHOLDS = {
   D_CRIT: 0.5,      // m — fallback depth at which water is treated as critical
   HR_CRIT: 1.25,    // fallback depth-velocity hazard normalization
   MIN_DEPTH: 0.01,  // m — below this a cell is dry (not drawn)
+  KINETIC_FLOOR: 0.08,  // m — velocity danger ignored below this depth (kills hillside-film speckle)
   ALPHA_FULL: 0.6,  // m — depth at which the water is fully opaque
   ALPHA_MIN: 0.18,  // opacity of the thinnest drawn water
   ALPHA_MAX: 0.94,  // opacity of deep water

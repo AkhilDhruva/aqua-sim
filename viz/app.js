@@ -25,6 +25,8 @@ const state = {
   scene: null, camera: null, renderer: null, controls: null,
   vertExag: 4.0,        // derived per run from terrain relief (see buildScene)
   hazard: null,         // engine hazard thresholds from manifest.json
+  nodes: [],            // sink-node positions from manifest.json
+  nodeMarkers: [],      // {node, mesh} pairs in the scene
 };
 
 // Engine hazard thresholds for the shader/legend: prefer the values the run's
@@ -73,6 +75,7 @@ async function loadRun() {
     state.terrain = terrain;
     state.frames = frames;
     state.alerts = alerts;
+    state.nodes = manifest.nodes || [];
     state.hazard = manifest.hazard || null;
     state.nx = terrain.nx; state.ny = terrain.ny; state.dx = terrain.dx;
     state.cur = 0;
@@ -171,12 +174,61 @@ function buildScene() {
   wMesh.name = 'waterMesh';
   state.scene.add(wMesh);
 
+  // ----- sink-node markers (subway stations etc.) -----
+  for (const m of state.nodeMarkers) state.scene.remove(m.group);
+  state.nodeMarkers = [];
+  const cxg = (nx - 1) / 2, cyg = (ny - 1) / 2;
+  const pinH = Math.max(W, H) * 0.03;
+  const pinR = Math.max(W, H) * 0.004;
+  for (const node of state.nodes) {
+    if (node.x == null || node.y == null) continue;
+    const gx = (node.x - cxg) * dx, gz = (node.y - cyg) * dx;
+    const gy = (terrain.z[node.y]?.[node.x] || 0) * state.vertExag;
+    const group = new THREE.Group();
+    const pin = new THREE.Mesh(
+      new THREE.ConeGeometry(pinR, pinH, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    pin.position.set(gx, gy + pinH / 2, gz);
+    pin.rotation.x = Math.PI;  // point down at the station
+    group.add(pin);
+    const label = makeTextSprite(node.name);
+    const lh = pinH * 0.7;  // label height in world units
+    label.scale.set(lh * label.userData.aspect, lh, 1);
+    label.position.set(gx, gy + pinH * 1.5, gz);
+    group.add(label);
+    state.scene.add(group);
+    state.nodeMarkers.push({ node, pin, group, baseColor: 0xffffff });
+  }
+
   // camera framing
   const span = Math.max(W, H);
   state.camera.position.set(0, span * 0.7, span * 0.9);
   state.camera.lookAt(0, 0, 0);
   state.controls.target.set(0, 0, 0);
   onResize();
+}
+
+// A small canvas-textured label that always faces the camera.
+function makeTextSprite(text) {
+  const pad = 8, fs = 42;
+  const cvs = document.createElement('canvas');
+  const ctx = cvs.getContext('2d');
+  ctx.font = `${fs}px ui-monospace, monospace`;
+  const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+  cvs.width = w; cvs.height = fs + pad * 2;
+  ctx.font = `${fs}px ui-monospace, monospace`;
+  ctx.fillStyle = 'rgba(10,14,20,0.82)';
+  ctx.fillRect(0, 0, cvs.width, cvs.height);
+  ctx.fillStyle = '#dfe7f2';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, pad, cvs.height / 2);
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.minFilter = THREE.LinearFilter;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  const scale = 0.0;  // set by caller relative to domain, below
+  spr.userData.aspect = cvs.width / cvs.height;
+  spr.scale.set(1, 1, 1);
+  return spr;
 }
 
 // A flat XZ grid; Y is filled in later (terrain elevation / water surface).
@@ -222,6 +274,7 @@ function makeWaterMaterial() {
       uDcrit: { value: hp.dCrit },
       uHRcrit: { value: hp.hrCrit },
       uDebris: { value: hp.debris },
+      uKineticFloor: { value: THRESHOLDS.KINETIC_FLOOR },
       uMinDepth: { value: THRESHOLDS.MIN_DEPTH },
       uAlphaFull: { value: THRESHOLDS.ALPHA_FULL },
       uAlphaMin: { value: THRESHOLDS.ALPHA_MIN },
@@ -243,7 +296,7 @@ function makeWaterMaterial() {
     fragmentShader: `
       precision highp float;
       varying float vDepth; varying float vSpeed;
-      uniform float uDcrit, uHRcrit, uDebris, uMinDepth, uAlphaFull, uAlphaMin, uAlphaMax;
+      uniform float uDcrit, uHRcrit, uDebris, uKineticFloor, uMinDepth, uAlphaFull, uAlphaMin, uAlphaMax;
       uniform vec3 uStopColor[5]; uniform float uStopPos[5]; uniform int uNumStops;
       vec3 gradient(float t) {
         if (t <= uStopPos[0]) return uStopColor[0];
@@ -259,7 +312,11 @@ function makeWaterMaterial() {
       void main() {
         if (vDepth < uMinDepth) discard;
         float depthN = vDepth / uDcrit;
-        float hazard = vDepth * (vSpeed + uDebris);   // engine's HR = d*(v+DF)
+        // Kinetic (velocity) danger only counts once water is deep enough to be
+        // a real surge — below the floor, a fast thin film over a steep slope is
+        // hillside runoff, not a critical hazard, so it must not read crimson.
+        float kinetic = step(uKineticFloor, vDepth);
+        float hazard = vDepth * (vSpeed + uDebris) * kinetic;   // engine's HR = d*(v+DF)
         float hazardN = hazard / uHRcrit;
         float danger = clamp(max(depthN, hazardN), 0.0, 1.0);
         vec3 col = gradient(danger);
@@ -339,6 +396,14 @@ function updateAlerts(fr) {
     const a = state.alerts[Number(r.dataset.idx)];
     r.classList.toggle('a-fired', a.time_s <= fr.time_s + 1e-6);
   });
+
+  // Light up station markers whose node is breaching on this frame.
+  const activeBreaches = new Set((fr.breaches || []).map((b) => b.node_id));
+  for (const m of state.nodeMarkers) {
+    const hot = activeBreaches.has(m.node.name);
+    m.pin.material.color.setHex(hot ? 0xff2b2b : m.baseColor);
+    m.pin.scale.setScalar(hot ? 1.6 : 1.0);
+  }
 
   // Overlay banners for breaches active on THIS frame.
   const overlay = document.getElementById('overlay');

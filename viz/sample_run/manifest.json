@@ -101,6 +101,20 @@
       "aoi": "Manhattan (illustrative)"
     }
   },
+  "nodes": [
+    {
+      "name": "Basin Transit Node",
+      "x": 19,
+      "y": 9,
+      "threshold_elevation": 0.359
+    },
+    {
+      "name": "Riverside Underpass",
+      "x": 3,
+      "y": 30,
+      "threshold_elevation": 0.796
+    }
+  ],
   "frames": [
     {
       "index": 1,
