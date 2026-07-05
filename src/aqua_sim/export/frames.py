@@ -126,6 +126,7 @@ def write_run(
                 {"index": i, "time_s": round(state.time_s, 3),
                  "provenance": frame_header,
                  "depth": _round_grid(state.depth, 4),
+                 "speed": _round_grid(state.speed, 3) if state.speed else [],
                  "max_depth": round(state.max_depth, 4),
                  "max_speed": round(state.max_speed, 4),
                  "total_volume_m3": round(state.total_volume_m3, 3),

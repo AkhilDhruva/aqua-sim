@@ -43,6 +43,7 @@ class FlowState:
     max_depth: float              # peak depth in the domain (m)
     max_speed: float              # peak flow speed (m/s)
     total_volume_m3: float        # water volume in the domain (mass-balance check)
+    speed: Matrix = field(default_factory=list)  # per-cell flow speed (m/s), for the kinetic shader
 
 
 def _zeros(ny: int, nx: int) -> Matrix:
@@ -224,25 +225,29 @@ class ShallowWaterSolver:
     # -- driving loop --------------------------------------------------------
 
     def _snapshot(self) -> FlowState:
+        nx, ny = self.grid.nx, self.grid.ny
         max_h = 0.0
         max_speed = 0.0
         total = 0.0
         area = self.grid.cell_area_m2()
         md = self.config.solver.min_depth
-        for y in range(self.grid.ny):
-            for x in range(self.grid.nx):
+        speed = _zeros(ny, nx)
+        for y in range(ny):
+            for x in range(nx):
                 hv = self.h[y][x]
                 if hv > max_h:
                     max_h = hv
                 total += hv * area
                 if hv > md:
-                    # Estimate speed from the larger adjacent face flux.
+                    # Cell speed ~ magnitude of the larger adjacent face flux / depth.
                     q = max(abs(self.qx[y][x]), abs(self.qx[y][x + 1]),
                             abs(self.qy[y][x]), abs(self.qy[y + 1][x]))
                     s = q / hv
+                    speed[y][x] = s
                     if s > max_speed:
                         max_speed = s
-        return FlowState(self.time_s, [row[:] for row in self.h], max_h, max_speed, total)
+        return FlowState(self.time_s, [row[:] for row in self.h], max_h, max_speed,
+                         total, speed=speed)
 
     def adaptive_dt(self) -> float:
         state_max_h = max((v for row in self.h for v in row), default=0.0)

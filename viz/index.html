@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aqua-sim — Flood Telemetry Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🌊</text></svg>" />
+<style>
+  :root { --bg:#0a0e14; --panel:#111826; --panel2:#0d131f; --line:#1f2a3d;
+          --ink:#dfe7f2; --muted:#8a97ad; --accent:#22e0e0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #app { display:grid; grid-template-columns: 1fr 320px; grid-template-rows: auto 1fr auto;
+    height:100vh; }
+  header { grid-column:1/3; display:flex; align-items:center; gap:16px;
+    padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel2); }
+  header h1 { font-size:14px; margin:0; letter-spacing:.5px; }
+  header h1 b { color:var(--accent); }
+  #prov { color:var(--muted); font-size:11px; }
+  #canvasWrap { grid-column:1; grid-row:2; position:relative; overflow:hidden; background:radial-gradient(ellipse at 50% 30%, #16202f, #070a10); }
+  #gl { display:block; width:100%; height:100%; }
+  /* alert overlay banners on the canvas */
+  #overlay { position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; gap:8px; width:min(760px,92%); pointer-events:none; z-index:5; }
+  .breach-banner { background:rgba(139,0,0,.92); border:1px solid #ff4d4d;
+    border-left:6px solid #ff2b2b; color:#fff; padding:10px 14px; border-radius:4px;
+    box-shadow:0 4px 24px rgba(220,20,60,.5); animation:flash 1s ease-in-out infinite;
+    font-size:13px; letter-spacing:.3px; }
+  .breach-banner .bb-tag { font-weight:700; background:#fff; color:#8B0000;
+    padding:1px 7px; border-radius:3px; margin-right:8px; }
+  @keyframes flash { 0%,100%{ box-shadow:0 4px 24px rgba(220,20,60,.35);} 50%{ box-shadow:0 4px 34px rgba(255,43,43,.9);} }
+  #status { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    background:rgba(0,0,0,.7); padding:12px 18px; border-radius:6px; max-width:70%;
+    text-align:center; color:var(--muted); z-index:6; }
+  /* right side panel */
+  aside { grid-column:2; grid-row:2; border-left:1px solid var(--line); background:var(--panel);
+    padding:14px; overflow-y:auto; }
+  aside h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px;
+    color:var(--muted); margin:18px 0 8px; }
+  aside h2:first-child { margin-top:0; }
+  #alertList { display:flex; flex-direction:column; gap:4px; }
+  .a-row { display:grid; grid-template-columns:64px 34px 1fr; gap:6px; align-items:start;
+    padding:6px 8px; border-radius:4px; background:var(--panel2); border:1px solid var(--line);
+    opacity:.45; cursor:pointer; transition:opacity .2s; }
+  .a-row.a-fired { opacity:1; }
+  .a-row .a-sev { font-weight:700; font-size:10px; }
+  .a-critical .a-sev { color:#ff5064; }
+  .a-warning  .a-sev { color:#ffb020; }
+  .a-row .a-t { color:var(--muted); }
+  .a-row .a-msg { font-size:11px; color:var(--ink); }
+  .a-none { color:var(--muted); }
+  /* legend */
+  #legendBar { height:14px; border-radius:3px; border:1px solid var(--line); }
+  .legend-labels { display:flex; justify-content:space-between; color:var(--muted);
+    font-size:10px; margin-top:3px; }
+  #legendCrit { color:#ff8098; font-size:10px; margin-top:4px; }
+  /* footer controls */
+  footer { grid-column:1/3; display:flex; align-items:center; gap:14px;
+    padding:10px 16px; border-top:1px solid var(--line); background:var(--panel2); }
+  footer button, footer select, header input, header button {
+    background:#17223a; color:var(--ink); border:1px solid var(--line);
+    border-radius:5px; padding:6px 10px; font:inherit; cursor:pointer; }
+  #scrubber { flex:1; accent-color:var(--accent); }
+  #hud { color:var(--muted); font-size:11px; min-width:260px; }
+  .grp { display:flex; align-items:center; gap:6px; }
+  label.sm { color:var(--muted); font-size:11px; }
+  code { color:var(--accent); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1><b>aqua-sim</b> · Flood Telemetry</h1>
+    <div id="prov">no run loaded</div>
+    <div style="margin-left:auto" class="grp">
+      <input id="runPath" value="sample_run" size="16" title="run folder (relative)" />
+      <button id="loadBtn">Load run</button>
+    </div>
+  </header>
+
+  <div id="canvasWrap">
+    <canvas id="gl"></canvas>
+    <div id="overlay"></div>
+    <div id="status">Loading…</div>
+  </div>
+
+  <aside>
+    <h2>Water color ramp</h2>
+    <div class="grp"><select id="paletteSel" style="flex:1"></select></div>
+    <div id="legendBar" style="margin-top:8px"></div>
+    <div class="legend-labels"><span>safe / shallow</span><span>critical / deep-fast</span></div>
+    <div id="legendCrit"></div>
+
+    <h2>Alert matrix</h2>
+    <div id="alertList"></div>
+
+    <h2>About</h2>
+    <div style="color:var(--muted);font-size:11px">
+      Depth &amp; velocity per cell come from the offline Python solver. Color =
+      danger = max(depth/D<sub>crit</sub>, hazard/HR<sub>crit</sub>); opacity rises
+      with depth. Click an alert to jump to it.
+    </div>
+  </aside>
+
+  <footer>
+    <button id="playBtn">▶ Play</button>
+    <input id="scrubber" type="range" min="0" max="0" value="0" step="1" />
+    <div class="grp"><label class="sm">speed</label>
+      <select id="speedSel">
+        <option value="4">4 fps</option>
+        <option value="8" selected>8 fps</option>
+        <option value="16">16 fps</option>
+        <option value="30">30 fps</option>
+      </select>
+    </div>
+    <div id="hud"></div>
+  </footer>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

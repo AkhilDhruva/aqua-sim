@@ -170,9 +170,18 @@ def _evaluate_alerts(scenario: Scenario, states):
     frame_breaches: list[list[dict]] = []
     prev_t = 0.0
 
+    peak_hazard = HazardClass.NONE
+    peak_hazard_time = 0.0
     for state in states:
         dt = state.time_s - prev_t
         prev_t = state.time_s
+        # Track the worst depth-velocity hazard reached anywhere in the domain.
+        for y in range(grid.ny):
+            row_d, row_s = state.depth[y], state.speed[y] if state.speed else None
+            for x in range(grid.nx):
+                hz = classify_hazard(row_d[x], row_s[x] if row_s else 0.0)
+                if hz > peak_hazard:
+                    peak_hazard, peak_hazard_time = hz, state.time_s
         events: list[dict] = []
         for node in nodes:
             h = state.depth[node.y][node.x]
@@ -210,6 +219,12 @@ def _evaluate_alerts(scenario: Scenario, states):
                     log.add(state.time_s, Severity.CRITICAL, node.name,
                             f"Breach detected at {node.name}.{eta}")
         frame_breaches.append(events)
+
+    # Domain-wide kinetic hazard summary (depth × velocity, not just depth).
+    if peak_hazard >= HazardClass.SIGNIFICANT:
+        log.add(peak_hazard_time, Severity.WARNING, "domain",
+                f"Peak surface-flow hazard reached {peak_hazard.name} "
+                f"(depth×velocity rating) at t={peak_hazard_time / 60:.0f} min.")
     return log, frame_breaches
 
 

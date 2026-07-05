@@ -21,12 +21,13 @@ biases toward physical correctness and reproducibility.
 - **[docs/DATA_SOURCING.md](docs/DATA_SOURCING.md)** — what a DEM is, and the
   public Manhattan datasets (USGS 3DEP, NYC LiDAR) we use.
 
-## Status: physics core running (P0–P3.5 done)
+## Status: end-to-end thin slice complete (P0–P4)
 
-The **shallow-water solver is real and validated**, the risk layer emits alerts,
-and a run exports the exact `frame_NNN.json` frames the browser viewer will read.
-Real DEM ingestion (P1) and the Three.js viewer (P4) are next. Roadmap in
-`docs/PLANNING.md`.
+The **shallow-water solver is real and validated**, real GeoTIFF DEM ingestion
+works, the risk layer emits alerts and per-frame breach records, and the
+**Three.js telemetry dashboard** (`viz/`) renders any exported run — kinetic
+depth×velocity shader, alert matrix, breach banners, live palette switcher.
+Roadmap in `docs/PLANNING.md`.
 
 The solver is a local-inertial (LISFLOOD-FP / Bates 2010) scheme, is
 **mass-conserving to floating-point** and **well-balanced** (lake-at-rest), with a
@@ -51,6 +52,14 @@ Run on a **real DEM** (adds rasterio/numpy/pyproj):
 pip install -e ".[geo]"
 python -m aqua_sim.ingestion.fetch manhattan_3dep.tif        # USGS 3DEP (needs egress)
 python -m aqua_sim run output/mn --dem manhattan_3dep.tif    # reproject -> solve -> frames
+```
+
+View a run in the **3D telemetry dashboard**:
+
+```bash
+python -m http.server 8000
+# open http://localhost:8000/viz/          (sample run included in the repo)
+# or    http://localhost:8000/viz/?run=../output/mn
 ```
 
 A run writes `manifest.json` (with a provenance block), `terrain.json`,
@@ -84,7 +93,12 @@ aqua-sim/
 │   │   ├── sink_nodes.py     #    orifice inflow         (real, tested)
 │   │   └── alerts.py         #    time-stamped risk log  (real, tested)
 │   └── export/frames.py      # 4. run export (manifest + frames)  (real, tested)
-├── viz/                      # 4. Three.js browser viewer (Phase 4)
+├── viz/                      # 4. Three.js telemetry dashboard (real, verified)
+│   ├── index.html            #    command-center UI (scrubber, alert matrix)
+│   ├── app.js                #    scene + kinetic GLSL water shader
+│   ├── palettes.js           #    4 switchable color ramps + thresholds
+│   ├── sample_run/           #    bundled demo run (49 frames)
+│   └── vendor/               #    vendored Three.js (offline, no CDN)
 ├── tests/                    # pytest suite
 └── pyproject.toml
 ```

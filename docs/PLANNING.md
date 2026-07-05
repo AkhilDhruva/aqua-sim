@@ -111,7 +111,7 @@ risk. Each milestone has a concrete "done" check.
 | **P3 — Risk layer** | Sink nodes (orifice inflow), depth×velocity hazard classes, alert log | ✅ **Done** — scenario emits time-stamped, ranked WARNING/CRITICAL alerts with inundation ETA |
 | **P3.5 — Frame export** | Provenance-rich `manifest.json` + `frame_NNN.json` + `alerts.json` | ✅ **Done** — `python -m aqua_sim run OUTDIR` writes a full run folder |
 | **P1 — Real ingestion** | GeoTIFF DEM → metric UTM `Grid`; resample; geofence clip; nodata fill | ✅ **Done** — `DEMSource` implemented + tested (reproject to UTM 18N, AOI clip, `--dem` run). Live USGS fetch pending network egress (blocked by policy in the current sandbox). |
-| **P4 — Visualization** | Three.js viewer over the run folder: orbit camera, depth/velocity shader, storm sliders | ⏭ **Next** — stakeholder loads a run in-browser and scrubs time |
+| **P4 — Visualization** | Three.js telemetry dashboard: orbit camera, kinetic depth×velocity shader, palette switcher, alert matrix, breach banners | ✅ **Done** — verified headless-Chromium render of the sample run (`viz/`); loads any run folder |
 | **P5 — Drone/LiDAR ingestion** | Photogrammetry (SfM→DSM/DTM) and LiDAR (PDAL) as pluggable sources | Drone image set or `.laz` produces a `Grid` behind the same interface as P1 |
 | **P6 — Hardening** | Taichi/GPU kernel, tiling for city scale, infiltration model, real-event validation (NYC 2021 / FEMA layer) | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
 
