@@ -69,3 +69,21 @@ def test_resolution_controls_cell_count(dem_tif):
 def test_max_cells_guard(dem_tif):
     with pytest.raises(ValueError, match="max_cells"):
         DEMSource(dem_tif, target_dx_m=1.0, max_cells=1000).load()
+
+
+def test_nan_nodata_is_masked_out(tmp_path):
+    # Regression: NaN pixels (common float32 nodata) must be masked invalid,
+    # not treated as real elevation — one NaN would otherwise poison the grid.
+    w = h = 60
+    z = np.full((h, w), 10.0, np.float32)
+    z[:10, :10] = np.nan
+    path = str(tmp_path / "nan_dem.tif")
+    transform = from_bounds(*BBOX, w, h)
+    with rasterio.open(path, "w", driver="GTiff", height=h, width=w, count=1,
+                       dtype="float32", crs="EPSG:4326", transform=transform,
+                       nodata=None) as dst:  # nodata unset: the nasty case
+        dst.write(z, 1)
+    grid = DEMSource(path, target_dx_m=120.0).load()
+    flat_z = [v for row in grid.z for v in row]
+    assert all(v == v for v in flat_z)          # no NaN anywhere (NaN != NaN)
+    assert any(not m for row in grid.mask for m in row)  # NaN region masked out

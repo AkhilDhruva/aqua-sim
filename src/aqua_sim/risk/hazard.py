@@ -13,6 +13,18 @@ from __future__ import annotations
 
 from enum import IntEnum
 
+#: Debris factor DF in HR = d·(v + DF). Exported into every run manifest so the
+#: viewer's shader uses the engine's value — never a hard-coded copy.
+DEBRIS_FACTOR = 0.5
+
+#: Upper HR bound of each band (exclusive). Above 'significant' is EXTREME.
+HR_BANDS = {"low": 0.75, "moderate": 1.25, "significant": 2.0}
+
+#: Still-water depth treated as critical for infrastructure (subway/basement
+#: ingress, vehicle stall) independent of velocity. Display guidance for the
+#: viewer's danger normalization; also exported in the manifest.
+DEPTH_CRITICAL_M = 0.5
+
 
 class HazardClass(IntEnum):
     """Severity bands, ordered so higher == more dangerous."""
@@ -24,26 +36,26 @@ class HazardClass(IntEnum):
     EXTREME = 4
 
 
-def hazard_rating(depth: float, speed: float, debris_factor: float = 0.5) -> float:
+def hazard_rating(depth: float, speed: float, debris_factor: float = DEBRIS_FACTOR) -> float:
     """Depth-velocity hazard rating HR = d * (v + DF)."""
     if depth <= 0:
         return 0.0
     return depth * (max(speed, 0.0) + debris_factor)
 
 
-def classify_hazard(depth: float, speed: float, debris_factor: float = 0.5) -> HazardClass:
+def classify_hazard(depth: float, speed: float, debris_factor: float = DEBRIS_FACTOR) -> HazardClass:
     """Map a cell's depth and speed to a :class:`HazardClass`.
 
-    Band thresholds (HR): <0.75 low, <1.25 moderate, <2.0 significant, else extreme.
-    A dry cell is NONE regardless of the formula.
+    Band thresholds come from :data:`HR_BANDS`; a dry cell is NONE regardless
+    of the formula.
     """
     if depth <= 0:
         return HazardClass.NONE
     hr = hazard_rating(depth, speed, debris_factor)
-    if hr < 0.75:
+    if hr < HR_BANDS["low"]:
         return HazardClass.LOW
-    if hr < 1.25:
+    if hr < HR_BANDS["moderate"]:
         return HazardClass.MODERATE
-    if hr < 2.0:
+    if hr < HR_BANDS["significant"]:
         return HazardClass.SIGNIFICANT
     return HazardClass.EXTREME

@@ -21,6 +21,12 @@ def _full(ny: int, nx: int, value: float) -> Matrix:
     return [[value for _ in range(nx)] for _ in range(ny)]
 
 
+def zeros(ny: int, nx: int) -> Matrix:
+    """An ny×nx matrix of 0.0 — the one matrix constructor shared by the grid
+    and the solver, so a future NumPy/Taichi backend swaps in one place."""
+    return _full(ny, nx, 0.0)
+
+
 @dataclass
 class Grid:
     """A metric, georeferenced terrain grid.

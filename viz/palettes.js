@@ -18,9 +18,14 @@
 //   danger 0.80  -> ~0.50 m  : CRITICAL — subway/basement ingress (hot)
 //   danger 1.00  -> >=1.0 m  : lethal / total inundation          (opaque, hottest)
 
+// NOTE: D_CRIT / HR_CRIT here are FALLBACKS for pre-2.0 runs only. Runs with
+// format_version >= 2.0 export the engine's hazard constants in manifest.json
+// ("hazard": debris_factor, hr_bands, depth_critical_m) and the app reads those
+// (see hazardParams() in app.js), so shader coloring can never drift from the
+// thresholds the alerts were computed with.
 export const THRESHOLDS = {
-  D_CRIT: 0.5,      // m — depth at which water is treated as critical
-  HR_CRIT: 1.25,    // depth-velocity hazard rating for "significant" band
+  D_CRIT: 0.5,      // m — fallback depth at which water is treated as critical
+  HR_CRIT: 1.25,    // fallback depth-velocity hazard normalization
   MIN_DEPTH: 0.01,  // m — below this a cell is dry (not drawn)
   ALPHA_FULL: 0.6,  // m — depth at which the water is fully opaque
   ALPHA_MIN: 0.18,  // opacity of the thinnest drawn water

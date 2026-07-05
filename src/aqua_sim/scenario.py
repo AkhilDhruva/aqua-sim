@@ -100,7 +100,6 @@ def build_manhattan_demo(nx: int = 48, ny: int = 72, dx: float = 60.0) -> Scenar
 
 
 # Breach thresholds (see the "breach definition" note in docs/ARCHITECTURE.md §4.2).
-_MIN_DEPTH = 1e-3          # m; ignore numerically thin water films
 _BREACH_HEAD_EPS = 0.02   # m; head above the entrance lip that counts as a breach
 _WARN_APPROACH = 0.15     # m; how close below the lip triggers an early warning
 
@@ -155,84 +154,115 @@ def _auto_sink_nodes(grid: Grid, count: int = 3) -> list[SinkNode]:
     return nodes
 
 
-def _evaluate_alerts(scenario: Scenario, states):
-    """Scan frames for hazard escalation and sink-node breaches.
+class _AlertScanner:
+    """Per-frame risk evaluation, built for streaming.
 
-    Returns ``(AlertLog, frame_breaches)`` where ``frame_breaches[i]`` is the list
-    of active-breach objects for ``states[i]`` — the solver-side breach records
-    embedded per frame, so a frame is self-contained proof of the event.
+    ``scan(state)`` is called once per frame as the solver yields it; the
+    scanner appends that frame's active-breach objects to ``frame_breaches``
+    (which the exporter indexes as it writes) and accumulates the alert log.
+    Holding only running accumulators — never the frames — keeps memory at
+    O(one frame) for arbitrarily long runs.
     """
-    log = AlertLog()
-    grid, nodes = scenario.grid, scenario.nodes
-    warned_surface: set[str] = set()
-    breached: set[str] = set()
-    node_fill = {n.name: 0.0 for n in nodes}  # accumulated inflow volume (m^3)
-    frame_breaches: list[list[dict]] = []
-    prev_t = 0.0
 
-    peak_hazard = HazardClass.NONE
-    peak_hazard_time = 0.0
-    for state in states:
-        dt = state.time_s - prev_t
-        prev_t = state.time_s
+    def __init__(self, scenario: Scenario) -> None:
+        self.grid = scenario.grid
+        self.nodes = scenario.nodes
+        # "Dry film" cutoff for risk logic, derived from the solver's own dry
+        # threshold (one order of magnitude above it) so the two can never be
+        # configured into contradiction.
+        self.min_depth = 10.0 * scenario.config.solver.min_depth
+        self.cell_area = scenario.grid.cell_area_m2()
+        self.log = AlertLog()
+        self.frame_breaches: list[list[dict]] = []
+        self._warned: set[str] = set()
+        self._breached: set[str] = set()
+        self._node_fill = {n.name: 0.0 for n in scenario.nodes}
+        self._prev_t = 0.0
+        self._peak_hazard = HazardClass.NONE
+        self._peak_hazard_time = 0.0
+
+    def scan(self, state) -> None:
+        grid = self.grid
+        dt = state.time_s - self._prev_t
+        self._prev_t = state.time_s
         # Track the worst depth-velocity hazard reached anywhere in the domain.
         for y in range(grid.ny):
-            row_d, row_s = state.depth[y], state.speed[y] if state.speed else None
+            row_d, row_s = state.depth[y], state.speed[y]
             for x in range(grid.nx):
-                hz = classify_hazard(row_d[x], row_s[x] if row_s else 0.0)
-                if hz > peak_hazard:
-                    peak_hazard, peak_hazard_time = hz, state.time_s
+                hz = classify_hazard(row_d[x], row_s[x])
+                if hz > self._peak_hazard:
+                    self._peak_hazard, self._peak_hazard_time = hz, state.time_s
+
         events: list[dict] = []
-        for node in nodes:
+        for node in self.nodes:
             h = state.depth[node.y][node.x]
-            if h <= _MIN_DEPTH:
+            if h <= self.min_depth:
                 continue
             wse = grid.z[node.y][node.x] + h      # local water-surface elevation η
             head = wse - node.threshold_elevation  # hydraulic head over the entrance lip
+            breaching = head > _BREACH_HEAD_EPS
 
-            # Early warning: surface water is nearing the entrance lip.
-            if (head >= -_WARN_APPROACH and node.name not in warned_surface
-                    and node.name not in breached):
-                warned_surface.add(node.name)
-                log.add(state.time_s, Severity.WARNING, node.name,
-                        f"Surface water approaching critical threshold at {node.name} "
-                        f"(head {head:+.2f} m).")
+            # Early warning: water nearing the lip. Suppressed when this same
+            # frame already breaches — a warning with zero lead time is noise.
+            if (not breaching and head >= -_WARN_APPROACH
+                    and node.name not in self._warned
+                    and node.name not in self._breached):
+                self._warned.add(node.name)
+                self.log.add(state.time_s, Severity.WARNING, node.name,
+                             f"Surface water approaching critical threshold at "
+                             f"{node.name} (head {head:+.2f} m).")
 
-            # Breach: water surface is above the entrance lip by a physical margin.
-            if head > _BREACH_HEAD_EPS:
+            # Breach: water surface above the lip by a physical margin.
+            if breaching:
                 q = orifice_inflow(node, wse)  # orifice discharge, m^3/s
-                node_fill[node.name] = min(node.capacity_m3, node_fill[node.name] + q * dt)
-                frac = node_fill[node.name] / node.capacity_m3 if node.capacity_m3 else 0.0
+                if dt > 0:
+                    # The node cannot ingest more water than the cell holds:
+                    # cap the rate by the volume available over this interval.
+                    q = min(q, h * self.cell_area / dt)
+                    self._node_fill[node.name] = min(
+                        node.capacity_m3, self._node_fill[node.name] + q * dt)
+                fill = self._node_fill[node.name]
+                frac = fill / node.capacity_m3 if node.capacity_m3 else 0.0
                 events.append({
                     "breach_detected": True,
                     "node_id": node.name,
                     "water_surface_m": round(wse, 3),
                     "head_m": round(head, 3),
                     "inundation_rate_m3_s": round(q, 2),
-                    "cumulative_volume_m3": round(node_fill[node.name], 1),
+                    "cumulative_volume_m3": round(fill, 1),
                     "fraction_full": round(frac, 3),
                 })
-                if node.name not in breached:
-                    breached.add(node.name)
+                if node.name not in self._breached:
+                    self._breached.add(node.name)
                     ttf = time_to_fill(node, wse)
                     eta = f" Est. full inundation in ~{ttf / 60:.0f} min." if ttf else ""
-                    log.add(state.time_s, Severity.CRITICAL, node.name,
-                            f"Breach detected at {node.name}.{eta}")
-        frame_breaches.append(events)
+                    self.log.add(state.time_s, Severity.CRITICAL, node.name,
+                                 f"Breach detected at {node.name}.{eta}")
+        self.frame_breaches.append(events)
 
-    # Domain-wide kinetic hazard summary (depth × velocity, not just depth).
-    if peak_hazard >= HazardClass.SIGNIFICANT:
-        log.add(peak_hazard_time, Severity.WARNING, "domain",
-                f"Peak surface-flow hazard reached {peak_hazard.name} "
-                f"(depth×velocity rating) at t={peak_hazard_time / 60:.0f} min.")
-    return log, frame_breaches
+    def records(self) -> list[dict]:
+        """Finalize: add the domain-wide hazard summary, return ranked records."""
+        if self._peak_hazard >= HazardClass.SIGNIFICANT:
+            self.log.add(self._peak_hazard_time, Severity.WARNING, "domain",
+                         f"Peak surface-flow hazard reached {self._peak_hazard.name} "
+                         f"(depth×velocity rating) at t={self._peak_hazard_time / 60:.0f} min.")
+        return self.log.to_records()
 
 
 def run_scenario(scenario: Scenario, run_dir: str) -> dict:
-    """Run the solver, evaluate alerts, and write the run folder. Returns manifest."""
+    """Run the solver, evaluate alerts, and write the run folder. Returns manifest.
+
+    Fully streaming: each frame is risk-scanned and written as the solver yields
+    it, so memory stays O(one frame) regardless of run length or grid size.
+    """
     solver = ShallowWaterSolver(scenario.grid, scenario.config, boundary=scenario.boundary)
-    states = list(solver.run())  # ~100 frames; small enough to hold in memory
-    alerts, frame_breaches = _evaluate_alerts(scenario, states)
-    return write_run(run_dir, scenario.grid, states, scenario.config,
-                     alerts=alerts.to_records(), frame_breaches=frame_breaches,
-                     scheme=scenario.config.solver.scheme)
+    scanner = _AlertScanner(scenario)
+
+    def stream():
+        for state in solver.run():
+            scanner.scan(state)  # appends this frame's breaches before export reads them
+            yield state
+
+    return write_run(run_dir, scenario.grid, stream(), scenario.config,
+                     alerts=scanner.records,  # evaluated after the last frame
+                     frame_breaches=scanner.frame_breaches)

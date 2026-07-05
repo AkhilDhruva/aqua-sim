@@ -4,9 +4,10 @@ Pipeline (see docs/DATA_INGESTION.md §3):
     rasterio read -> reproject to local UTM (metric) -> resample to target dx
     -> clip to geofence AOI -> void-fill nodata -> Grid
 
-Requires the optional ``geo`` extra (``pip install -e ".[geo]"``): rasterio,
-numpy, pyproj. These are imported lazily inside ``load()`` so the dependency-free
-core (config, grid, solver, risk) stays importable without them.
+Requires the optional ``geo`` extra (``pip install -e ".[geo]"``): rasterio and
+numpy. These are imported lazily inside ``load()`` so the dependency-free core
+(config, grid, solver, risk) stays importable without them. Reprojection and the
+affine transform come from rasterio itself (GDAL-backed) — no direct pyproj use.
 
 The output is a ``Grid`` with pure-Python nested-list fields — identical to every
 other TerrainSource — so the solver and risk layers consume it unchanged.
@@ -61,7 +62,7 @@ class DEMSource(TerrainSource):
     def load(self) -> Grid:
         import numpy as np
         import rasterio
-        from affine import Affine
+        from rasterio.transform import Affine  # rasterio's own re-export
         from rasterio.warp import Resampling, reproject, transform_bounds
 
         with rasterio.open(self.path) as src:
@@ -117,7 +118,10 @@ class DEMSource(TerrainSource):
                 resampling=Resampling.bilinear,
             )
 
-        valid = dst != fill
+        # A cell is valid only if it is finite AND not the fill value — NaN
+        # nodata (common in float32 3DEP products) passes a `!= fill` test and
+        # would otherwise poison every downstream computation.
+        valid = np.isfinite(dst) & (dst != fill)
         if not valid.any():
             raise ValueError("No valid elevation data after reprojection/clip.")
         # Void-fill: set nodata cells to the minimum valid elevation and mask them

@@ -63,16 +63,24 @@ def _run(out_dir: str, dem_path: str | None = None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = sys.argv[1:] if argv is None else argv
-    if args and args[0] == "run":
-        rest = args[1:]
-        dem_path = None
-        if "--dem" in rest:
-            i = rest.index("--dem")
-            dem_path = rest[i + 1] if i + 1 < len(rest) else None
-            rest = rest[:i] + rest[i + 2:]
-        out = rest[0] if rest else "output/manhattan_run"
-        return _run(out, dem_path=dem_path)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="aqua-sim",
+        description="Flood Zone Risk Simulator — offline shallow-water engine.")
+    sub = parser.add_subparsers(dest="command")
+    run_p = sub.add_parser("run", help="run a scenario and export frames")
+    run_p.add_argument("outdir", nargs="?", default="output/manhattan_run",
+                       help="run folder to write (default: output/manhattan_run)")
+    run_p.add_argument("--dem", metavar="PATH", default=None,
+                       help="GeoTIFF DEM to simulate on (omit for the synthetic demo)")
+
+    ns = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    if ns.command == "run":
+        # argparse errors out loudly on `--dem` with a missing value and accepts
+        # `--dem=path` — a forgotten path can no longer silently substitute the
+        # synthetic demo for a real-DEM run.
+        return _run(ns.outdir, dem_path=ns.dem)
     return _self_check()
 
 

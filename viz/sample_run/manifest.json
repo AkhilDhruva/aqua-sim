@@ -1,6 +1,6 @@
 {
-  "format_version": "1.1",
-  "run_id": "10b95dfd5a10ef64",
+  "format_version": "2.0",
+  "run_id": "366dc313e5b19055",
   "aoi": "Manhattan (demo)",
   "grid": {
     "nx": 40,
@@ -66,9 +66,19 @@
     7200.0
   ],
   "frame_count": 49,
-  "peak_depth_m": 0.893,
+  "peak_depth_m": 0.8937,
+  "hazard": {
+    "debris_factor": 0.5,
+    "hr_bands": {
+      "low": 0.75,
+      "moderate": 1.25,
+      "significant": 2.0
+    },
+    "depth_critical_m": 0.5
+  },
   "provenance": {
     "terrain_source": "build_manhattan_demo",
+    "terrain_digest": "b20943892099fe93",
     "resolution_m": 60.0,
     "crs": "SYNTHETIC (Manhattan-scaled stand-in)",
     "solver_scheme": "local_inertial",
@@ -110,70 +120,70 @@
       "index": 3,
       "file": "frame_003.json",
       "time_s": 300.0,
-      "max_depth": 0.0134,
+      "max_depth": 0.0126,
       "breach_count": 0
     },
     {
       "index": 4,
       "file": "frame_004.json",
       "time_s": 450.0,
-      "max_depth": 0.0257,
+      "max_depth": 0.0232,
       "breach_count": 0
     },
     {
       "index": 5,
       "file": "frame_005.json",
       "time_s": 600.0,
-      "max_depth": 0.0473,
+      "max_depth": 0.0423,
       "breach_count": 0
     },
     {
       "index": 6,
       "file": "frame_006.json",
       "time_s": 750.0,
-      "max_depth": 0.0838,
+      "max_depth": 0.0759,
       "breach_count": 0
     },
     {
       "index": 7,
       "file": "frame_007.json",
       "time_s": 900.0,
-      "max_depth": 0.1288,
+      "max_depth": 0.1224,
       "breach_count": 0
     },
     {
       "index": 8,
       "file": "frame_008.json",
       "time_s": 1050.0,
-      "max_depth": 0.1798,
+      "max_depth": 0.1754,
       "breach_count": 1
     },
     {
       "index": 9,
       "file": "frame_009.json",
       "time_s": 1200.0,
-      "max_depth": 0.2237,
+      "max_depth": 0.2224,
       "breach_count": 1
     },
     {
       "index": 10,
       "file": "frame_010.json",
       "time_s": 1350.0,
-      "max_depth": 0.266,
+      "max_depth": 0.2656,
       "breach_count": 1
     },
     {
       "index": 11,
       "file": "frame_011.json",
       "time_s": 1500.0,
-      "max_depth": 0.3008,
+      "max_depth": 0.3006,
       "breach_count": 1
     },
     {
       "index": 12,
       "file": "frame_012.json",
       "time_s": 1650.0,
-      "max_depth": 0.3304,
+      "max_depth": 0.3302,
       "breach_count": 1
     },
     {
@@ -187,252 +197,252 @@
       "index": 14,
       "file": "frame_014.json",
       "time_s": 1950.0,
-      "max_depth": 0.3856,
+      "max_depth": 0.3857,
       "breach_count": 1
     },
     {
       "index": 15,
       "file": "frame_015.json",
       "time_s": 2100.0,
-      "max_depth": 0.41,
+      "max_depth": 0.4103,
       "breach_count": 1
     },
     {
       "index": 16,
       "file": "frame_016.json",
       "time_s": 2250.0,
-      "max_depth": 0.4329,
+      "max_depth": 0.4332,
       "breach_count": 1
     },
     {
       "index": 17,
       "file": "frame_017.json",
       "time_s": 2400.0,
-      "max_depth": 0.4541,
+      "max_depth": 0.4545,
       "breach_count": 1
     },
     {
       "index": 18,
       "file": "frame_018.json",
       "time_s": 2550.0,
-      "max_depth": 0.4743,
+      "max_depth": 0.4747,
       "breach_count": 1
     },
     {
       "index": 19,
       "file": "frame_019.json",
       "time_s": 2700.0,
-      "max_depth": 0.4931,
+      "max_depth": 0.4934,
       "breach_count": 1
     },
     {
       "index": 20,
       "file": "frame_020.json",
       "time_s": 2850.0,
-      "max_depth": 0.512,
+      "max_depth": 0.5124,
       "breach_count": 1
     },
     {
       "index": 21,
       "file": "frame_021.json",
       "time_s": 3000.0,
-      "max_depth": 0.53,
+      "max_depth": 0.5303,
       "breach_count": 1
     },
     {
       "index": 22,
       "file": "frame_022.json",
       "time_s": 3150.0,
-      "max_depth": 0.5477,
+      "max_depth": 0.548,
       "breach_count": 1
     },
     {
       "index": 23,
       "file": "frame_023.json",
       "time_s": 3300.0,
-      "max_depth": 0.565,
+      "max_depth": 0.5653,
       "breach_count": 1
     },
     {
       "index": 24,
       "file": "frame_024.json",
       "time_s": 3450.0,
-      "max_depth": 0.5813,
+      "max_depth": 0.5817,
       "breach_count": 1
     },
     {
       "index": 25,
       "file": "frame_025.json",
       "time_s": 3600.0,
-      "max_depth": 0.5973,
+      "max_depth": 0.5977,
       "breach_count": 1
     },
     {
       "index": 26,
       "file": "frame_026.json",
       "time_s": 3750.0,
-      "max_depth": 0.613,
+      "max_depth": 0.6133,
       "breach_count": 1
     },
     {
       "index": 27,
       "file": "frame_027.json",
       "time_s": 3900.0,
-      "max_depth": 0.6279,
+      "max_depth": 0.6284,
       "breach_count": 1
     },
     {
       "index": 28,
       "file": "frame_028.json",
       "time_s": 4050.0,
-      "max_depth": 0.6425,
+      "max_depth": 0.6429,
       "breach_count": 1
     },
     {
       "index": 29,
       "file": "frame_029.json",
       "time_s": 4200.0,
-      "max_depth": 0.6564,
+      "max_depth": 0.6569,
       "breach_count": 1
     },
     {
       "index": 30,
       "file": "frame_030.json",
       "time_s": 4350.0,
-      "max_depth": 0.6702,
+      "max_depth": 0.6706,
       "breach_count": 1
     },
     {
       "index": 31,
       "file": "frame_031.json",
       "time_s": 4500.0,
-      "max_depth": 0.6835,
+      "max_depth": 0.684,
       "breach_count": 1
     },
     {
       "index": 32,
       "file": "frame_032.json",
       "time_s": 4650.0,
-      "max_depth": 0.6968,
+      "max_depth": 0.6973,
       "breach_count": 1
     },
     {
       "index": 33,
       "file": "frame_033.json",
       "time_s": 4800.0,
-      "max_depth": 0.7098,
+      "max_depth": 0.7103,
       "breach_count": 1
     },
     {
       "index": 34,
       "file": "frame_034.json",
       "time_s": 4950.0,
-      "max_depth": 0.7225,
+      "max_depth": 0.723,
       "breach_count": 1
     },
     {
       "index": 35,
       "file": "frame_035.json",
       "time_s": 5100.0,
-      "max_depth": 0.7351,
+      "max_depth": 0.7355,
       "breach_count": 1
     },
     {
       "index": 36,
       "file": "frame_036.json",
       "time_s": 5250.0,
-      "max_depth": 0.7474,
+      "max_depth": 0.7479,
       "breach_count": 1
     },
     {
       "index": 37,
       "file": "frame_037.json",
       "time_s": 5400.0,
-      "max_depth": 0.7596,
+      "max_depth": 0.7601,
       "breach_count": 1
     },
     {
       "index": 38,
       "file": "frame_038.json",
       "time_s": 5550.0,
-      "max_depth": 0.7718,
+      "max_depth": 0.7724,
       "breach_count": 1
     },
     {
       "index": 39,
       "file": "frame_039.json",
       "time_s": 5700.0,
-      "max_depth": 0.7839,
+      "max_depth": 0.7845,
       "breach_count": 1
     },
     {
       "index": 40,
       "file": "frame_040.json",
       "time_s": 5850.0,
-      "max_depth": 0.7958,
+      "max_depth": 0.7964,
       "breach_count": 1
     },
     {
       "index": 41,
       "file": "frame_041.json",
       "time_s": 6000.0,
-      "max_depth": 0.8075,
+      "max_depth": 0.8081,
       "breach_count": 1
     },
     {
       "index": 42,
       "file": "frame_042.json",
       "time_s": 6150.0,
-      "max_depth": 0.8192,
+      "max_depth": 0.8197,
       "breach_count": 1
     },
     {
       "index": 43,
       "file": "frame_043.json",
       "time_s": 6300.0,
-      "max_depth": 0.8305,
+      "max_depth": 0.8311,
       "breach_count": 1
     },
     {
       "index": 44,
       "file": "frame_044.json",
       "time_s": 6450.0,
-      "max_depth": 0.8415,
+      "max_depth": 0.842,
       "breach_count": 1
     },
     {
       "index": 45,
       "file": "frame_045.json",
       "time_s": 6600.0,
-      "max_depth": 0.8521,
+      "max_depth": 0.8526,
       "breach_count": 1
     },
     {
       "index": 46,
       "file": "frame_046.json",
       "time_s": 6750.0,
-      "max_depth": 0.8627,
+      "max_depth": 0.8632,
       "breach_count": 1
     },
     {
       "index": 47,
       "file": "frame_047.json",
       "time_s": 6900.0,
-      "max_depth": 0.8729,
+      "max_depth": 0.8735,
       "breach_count": 1
     },
     {
       "index": 48,
       "file": "frame_048.json",
       "time_s": 7050.0,
-      "max_depth": 0.883,
+      "max_depth": 0.8835,
       "breach_count": 1
     },
     {
       "index": 49,
       "file": "frame_049.json",
       "time_s": 7200.0,
-      "max_depth": 0.893,
+      "max_depth": 0.8937,
       "breach_count": 1
     }
   ],

@@ -7,9 +7,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
-import { PALETTES, DEFAULT_PALETTE, THRESHOLDS, paletteUniforms, stopHexes } from './palettes.js';
-
-const VERT_EXAG = 4.0; // vertical exaggeration so terrain relief reads on screen
+import { PALETTES, DEFAULT_PALETTE, THRESHOLDS, paletteUniforms } from './palettes.js';
 
 const state = {
   manifest: null,
@@ -25,7 +23,21 @@ const state = {
   waterMat: null,
   waterGeom: null,
   scene: null, camera: null, renderer: null, controls: null,
+  vertExag: 4.0,        // derived per run from terrain relief (see buildScene)
+  hazard: null,         // engine hazard thresholds from manifest.json
 };
+
+// Engine hazard thresholds for the shader/legend: prefer the values the run's
+// manifest exports (the same constants the alerts were computed from); fall
+// back to the palettes.js defaults only for pre-2.0 runs.
+function hazardParams() {
+  const h = state.hazard || {};
+  return {
+    dCrit: h.depth_critical_m ?? THRESHOLDS.D_CRIT,
+    hrCrit: (h.hr_bands && h.hr_bands.moderate) ?? THRESHOLDS.HR_CRIT,
+    debris: h.debris_factor ?? 0.5,
+  };
+}
 
 // ---------- data loading ----------
 
@@ -36,8 +48,9 @@ async function fetchJSON(url) {
 }
 
 function runBase() {
-  const q = new URLSearchParams(location.search).get('run');
-  let base = q || document.getElementById('runPath').value || 'sample_run';
+  // The ?run= query seeds the input once (see initUI); after that the input is
+  // the single source of truth, so "Load run" always honors what the user typed.
+  let base = document.getElementById('runPath').value || 'sample_run';
   if (!base.endsWith('/')) base += '/';
   return base;
 }
@@ -60,12 +73,14 @@ async function loadRun() {
     state.terrain = terrain;
     state.frames = frames;
     state.alerts = alerts;
+    state.hazard = manifest.hazard || null;
     state.nx = terrain.nx; state.ny = terrain.ny; state.dx = terrain.dx;
     state.cur = 0;
 
     buildScene();
     buildAlertMatrix();
     showProvenance();
+    renderLegend();
     setFrame(0);
     setStatus('');
     document.getElementById('scrubber').max = String(frames.length - 1);
@@ -110,17 +125,24 @@ function buildScene() {
   const tCol = [];
   let zmin = Infinity, zmax = -Infinity;
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    if (terrain.mask && terrain.mask[j] && terrain.mask[j][i] === false) continue;
     const e = terrain.z[j][i] + (terrain.obstacle?.[j]?.[i] || 0);
     zmin = Math.min(zmin, e); zmax = Math.max(zmax, e);
   }
+  // Vertical exaggeration derived from this run's relief: exaggerate flat
+  // terrain so ponding reads, leave mountainous terrain near true scale.
+  const relief = Math.max(zmax - zmin, 1e-6);
+  state.vertExag = Math.min(12, Math.max(1, (0.025 * Math.max(W, H)) / relief));
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i;
+    const masked = terrain.mask && terrain.mask[j] && terrain.mask[j][i] === false;
     const base = terrain.z[j][i];
     const obs = terrain.obstacle?.[j]?.[i] || 0;
     const e = base + obs;
-    tPos.setY(k, e * VERT_EXAG);
+    tPos.setY(k, e * state.vertExag);
     let col;
-    if (obs > 0) col = new THREE.Color(0x2b3550);         // buildings: slate
+    if (masked) col = new THREE.Color(0x0a0d13);          // nodata / outside AOI: void
+    else if (obs > 0) col = new THREE.Color(0x2b3550);    // buildings: slate
     else {
       const t = (e - zmin) / Math.max(zmax - zmin, 1e-6);
       col = new THREE.Color().setHSL(0.30 - 0.12 * t, 0.35, 0.18 + 0.30 * t);
@@ -178,22 +200,35 @@ function gridGeometry(nx, ny, dx) {
   return geom;
 }
 
+// Pack a palette's stops into THREE.Vector3 uniforms — the single helper used
+// by both the initial material build and live palette switches.
+function stopVectors(key) {
+  const pu = paletteUniforms(key);
+  const vecs = [];
+  for (let t = 0; t < pu.count; t++) {
+    vecs.push(new THREE.Vector3(pu.colors[t * 3], pu.colors[t * 3 + 1], pu.colors[t * 3 + 2]));
+  }
+  return { vecs, positions: pu.positions, count: pu.count };
+}
+
 function makeWaterMaterial() {
-  const pu = paletteUniforms(state.palette);
+  const sv = stopVectors(state.palette);
+  const hp = hazardParams();
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     uniforms: {
-      uExag: { value: VERT_EXAG },
-      uDcrit: { value: THRESHOLDS.D_CRIT },
-      uHRcrit: { value: THRESHOLDS.HR_CRIT },
+      uExag: { value: state.vertExag },
+      uDcrit: { value: hp.dCrit },
+      uHRcrit: { value: hp.hrCrit },
+      uDebris: { value: hp.debris },
       uMinDepth: { value: THRESHOLDS.MIN_DEPTH },
       uAlphaFull: { value: THRESHOLDS.ALPHA_FULL },
       uAlphaMin: { value: THRESHOLDS.ALPHA_MIN },
       uAlphaMax: { value: THRESHOLDS.ALPHA_MAX },
-      uStopColor: { value: pu.colors.reduce((a, v, i) => { const t = Math.floor(i / 3); (a[t] ||= new THREE.Vector3()); a[t].setComponent(i % 3, v); return a; }, []) },
-      uStopPos: { value: pu.positions },
-      uNumStops: { value: pu.count },
+      uStopColor: { value: sv.vecs },
+      uStopPos: { value: sv.positions },
+      uNumStops: { value: sv.count },
     },
     vertexShader: `
       attribute float aBase; attribute float aDepth; attribute float aSpeed;
@@ -208,7 +243,7 @@ function makeWaterMaterial() {
     fragmentShader: `
       precision highp float;
       varying float vDepth; varying float vSpeed;
-      uniform float uDcrit, uHRcrit, uMinDepth, uAlphaFull, uAlphaMin, uAlphaMax;
+      uniform float uDcrit, uHRcrit, uDebris, uMinDepth, uAlphaFull, uAlphaMin, uAlphaMax;
       uniform vec3 uStopColor[5]; uniform float uStopPos[5]; uniform int uNumStops;
       vec3 gradient(float t) {
         if (t <= uStopPos[0]) return uStopColor[0];
@@ -224,7 +259,7 @@ function makeWaterMaterial() {
       void main() {
         if (vDepth < uMinDepth) discard;
         float depthN = vDepth / uDcrit;
-        float hazard = vDepth * (vSpeed + 0.5);
+        float hazard = vDepth * (vSpeed + uDebris);   // engine's HR = d*(v+DF)
         float hazardN = hazard / uHRcrit;
         float danger = clamp(max(depthN, hazardN), 0.0, 1.0);
         vec3 col = gradient(danger);
@@ -237,11 +272,10 @@ function makeWaterMaterial() {
 function applyPalette(key) {
   state.palette = key;
   if (!state.waterMat) return;
-  const pu = paletteUniforms(key);
-  state.waterMat.uniforms.uStopColor.value =
-    pu.colors.reduce((a, v, i) => { const t = Math.floor(i / 3); (a[t] ||= new THREE.Vector3()); a[t].setComponent(i % 3, v); return a; }, []);
-  state.waterMat.uniforms.uStopPos.value = pu.positions;
-  state.waterMat.uniforms.uNumStops.value = pu.count;
+  const sv = stopVectors(key);
+  state.waterMat.uniforms.uStopColor.value = sv.vecs;
+  state.waterMat.uniforms.uStopPos.value = sv.positions;
+  state.waterMat.uniforms.uNumStops.value = sv.count;
   state.waterMat.uniformsNeedUpdate = true;
   renderLegend();
 }
@@ -338,11 +372,16 @@ function showProvenance() {
 }
 
 function renderLegend() {
-  const hexes = stopHexes(state.palette);
-  const bar = document.getElementById('legendBar');
-  bar.style.background = `linear-gradient(90deg, ${hexes.join(', ')})`;
+  // Place each color at its actual shader stop position so the legend bar
+  // matches where the danger bands really begin.
+  const stops = (PALETTES[state.palette] || PALETTES[DEFAULT_PALETTE]).stops;
+  const cssStops = stops.map((s) => `${s.hex} ${Math.round(s.pos * 100)}%`);
+  document.getElementById('legendBar').style.background =
+    `linear-gradient(90deg, ${cssStops.join(', ')})`;
+  const hp = hazardParams();
   document.getElementById('legendCrit').textContent =
-    `critical ≈ depth ≥ ${THRESHOLDS.D_CRIT} m or hazard ≥ ${THRESHOLDS.HR_CRIT}`;
+    `critical ≈ depth ≥ ${hp.dCrit} m or hazard ≥ ${hp.hrCrit}` +
+    (state.hazard ? ' (from run manifest)' : ' (defaults)');
 }
 
 // ---------- loop + resize ----------
@@ -377,6 +416,10 @@ function setStatus(msg) {
 // ---------- wiring ----------
 
 function initUI() {
+  // ?run= seeds the input once; from then on the input is authoritative.
+  const q = new URLSearchParams(location.search).get('run');
+  if (q) document.getElementById('runPath').value = q;
+
   // palette selector
   const sel = document.getElementById('paletteSel');
   Object.entries(PALETTES).forEach(([k, p]) => {

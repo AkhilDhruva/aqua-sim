@@ -109,9 +109,16 @@ limit; wave information must not cross more than one cell per step:
 Δt ≤ α · Δx / ( |u| + √(g·h) )        0 < α ≤ 1  (α ≈ 0.7 typical)
 ```
 
-The solver recomputes the maximum stable `Δt` each step (adaptive timestepping)
-from the current depths/velocities. Omitting this — as the original note did — is
-the #1 cause of a flood solver "exploding." Lives in `physics/stability.py`.
+The solver recomputes the maximum stable `Δt` each step (adaptive timestepping).
+Both terms come free: peak depth is tracked during the depth update, and the
+advective velocity is the peak **face velocity** `|q|/h_flow` tracked inside the
+flux update itself — conveyance-referenced, so it stays physical at wetting
+fronts (dividing by a near-dry *cell* depth would explode). The celerity-only
+bound of Bates et al. (2010) is stable for depth but admits transient velocity
+oscillations at α≈0.7; the advective term suppresses them (verified by a
+dt-convergence check: peak depth agrees to <0.2% across α∈{0.1, 0.35, 0.7}).
+Omitting CFL control entirely — as the original note did — is the #1 cause of a
+flood solver "exploding." Lives in `physics/stability.py`.
 
 ### 3.4 Source / sink terms
 
@@ -162,15 +169,27 @@ the solver (not the viewer):
     head H = η − z_threshold      (z_threshold = elevation of the entrance lip)
     BREACH  ⇔  h > min_depth  AND  H > ε          (ε ≈ 0.02 m, a physical margin)
 
-The `min_depth` guard rejects numerically thin films; the `ε` margin rejects
-sub-centimeter noise around the lip so the trigger is deterministic, not chattery.
-On breach the solver emits the orifice discharge `Q = Cd·A·√(2gH)` (capped by
-capacity) and accumulates `∫Q dt` toward the node's storage, tracking
-`fraction_full`. A *warning* fires earlier, when `H ≥ −0.15 m` (water within
-15 cm below the lip). Severity thus escalates on physical state, not on frame
-count: **approaching lip → WARNING; head above lip → CRITICAL breach with an
-inundation rate and ETA.** Every breach is written into the frame where it occurs
-(see §6), so a frame is self-contained evidence of the event.
+The `min_depth` guard rejects numerically thin films (it is derived from the
+solver's own dry threshold, 10×, so the two can't be configured into
+contradiction); the `ε` margin rejects sub-centimeter noise around the lip so
+the trigger is deterministic, not chattery — a deliberate dead band: inflow at
+0 < H ≤ ε is physically possible but below the noise floor of the terrain data.
+On breach the engine emits the orifice discharge `Q = Cd·A·√(2gH)`, **capped by
+the water actually available in the cell over the interval** (a node cannot
+ingest more than the cell holds) and by node capacity, and accumulates `∫Q dt`
+toward the node's storage, tracking `fraction_full`. A *warning* fires earlier,
+when `H ≥ −0.15 m` (water within 15 cm below the lip) — and is suppressed if the
+same frame already breaches, since a warning with zero lead time is noise.
+Severity thus escalates on physical state, not on frame count: **approaching lip
+→ WARNING; head above lip → CRITICAL breach with an inundation rate and ETA.**
+Every breach is written into the frame where it occurs (see §6), so a frame is
+self-contained evidence of the event.
+
+*Evaluation cadence (honest limitation):* breach records are evaluated per
+**output frame**, so `∫Q dt` uses the output interval, not the solver's internal
+Δt. This is a screening-level integration; if a breach peaks and recedes entirely
+between two output frames it is missed. Tightening `output_interval_s` tightens
+the integration; moving the scan inside the solver loop is a Phase 6 refinement.
 
 ### 4.3 Alert log / risk matrix
 
@@ -198,21 +217,34 @@ Output as structured data (JSON) so both the viewer and reports consume it.
 A run exports:
 - `manifest.json` — grid metadata (CRS, transform, dx, extent), time axis, units,
   provenance, list of frame files, sink-node definitions.
-- `terrain.json` — static bed elevation + obstacle (building) heights, loaded once.
-- `frame_001.json … frame_NNN.json` — per-timestep water depth, peak stats, an
-  embedded **provenance header** (`run_id` + generation parameters), and the list
-  of active **breaches** for that instant (`{breach_detected, node_id, head_m,
-  inundation_rate_m3_s, cumulative_volume_m3, fraction_full}`). A frame is never
-  separable from how it was produced. (A later phase can swap the JSON body for a
-  compact typed-array `.bin` without changing the schema — the format is versioned.)
+- `terrain.json` — static bed elevation, obstacle (building) heights, and the
+  **AOI mask** (nodata cells are void-filled at ingest; only the mask tells the
+  viewer they are not real terrain), loaded once.
+- `frame_001.json … frame_NNN.json` — per-timestep water **depth and speed**
+  grids, peak stats, an embedded **provenance header** (`run_id` + generation
+  parameters), and the list of active **breaches** for that instant
+  (`{breach_detected, node_id, head_m, inundation_rate_m3_s,
+  cumulative_volume_m3, fraction_full}`). A frame is never separable from how it
+  was produced. (A later phase can swap the JSON body for a compact typed-array
+  `.bin` without changing the schema — the format is versioned; current:
+  **2.0**.)
 - `alerts.json` — the time-stamped, severity-ranked risk log (first-crossing events).
 
-**Provenance & determinism.** The manifest carries a full `provenance` block (data
-source, resolution, CRS, solver scheme, Manning value, storm & solver parameters)
-and a `run_id` — a SHA-256 content hash of that block. Identical inputs produce an
-identical `run_id`, so anyone can recompute a run and confirm they got the same
-frames. This is what "deterministically derived" means in practice, and it is the
-honest alternative to a wall-clock stamp or a decorative signature.
+**Hazard constants travel with the run.** The manifest's `hazard` block exports
+the engine's `debris_factor`, HR band bounds, and critical depth
+(`risk/hazard.py`), and the viewer's shader reads them from the manifest — so
+on-screen coloring can never drift from the thresholds the alerts were computed
+with.
+
+**Provenance & determinism.** The manifest carries a full `provenance` block
+(data source, **a SHA-256 digest of the terrain content**, resolution, CRS,
+solver scheme — validated at solver construction so it can never record a scheme
+that didn't run — Manning value, storm & solver parameters) and a `run_id` — a
+SHA-256 content hash of that block. Identical inputs over identical terrain
+produce an identical `run_id`; the same configuration over *different* terrain
+produces a different one. This is what "deterministically derived" means in
+practice, and it is the honest alternative to a wall-clock stamp or a decorative
+signature.
 
 Keeping this an explicit, versioned format is what lets the solver and viewer
 evolve independently.

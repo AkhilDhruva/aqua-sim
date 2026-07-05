@@ -56,7 +56,7 @@ def test_run_scenario_writes_frames_and_manifest(tmp_path):
 
 
 def test_run_id_is_deterministic(tmp_path):
-    # Same configuration -> identical run_id (deterministically derived).
+    # Same configuration AND same terrain -> identical run_id.
     from aqua_sim.physics import BoundaryType
     grid = Grid.empty(8, 8, 10.0)
     node = SinkNode("N", 4, 4, threshold_elevation=0.05, opening_area_m2=1.0)
@@ -70,6 +70,37 @@ def test_run_id_is_deterministic(tmp_path):
     m2 = run_scenario(Scenario(Grid.empty(8, 8, 10.0), cfg, [node], BoundaryType.CLOSED),
                       str(tmp_path / "b"))
     assert m1["run_id"] == m2["run_id"]
+
+    # Regression: different terrain content at identical config -> different id.
+    bumpy = Grid.empty(8, 8, 10.0)
+    bumpy.z[3][3] = 2.5
+    m3 = run_scenario(Scenario(bumpy, cfg, [node], BoundaryType.CLOSED), str(tmp_path / "c"))
+    assert m3["run_id"] != m1["run_id"]
+
+
+def test_export_contract_for_viewer(tmp_path):
+    # The viewer-facing contract: mask in terrain.json, hazard thresholds in the
+    # manifest, per-cell speed in every frame, format version 2.0.
+    from aqua_sim.physics import BoundaryType
+    from aqua_sim.risk.hazard import DEBRIS_FACTOR, DEPTH_CRITICAL_M
+    grid = Grid.empty(8, 8, 10.0)
+    grid.mask[0][0] = False  # one masked (nodata) cell
+    node = SinkNode("N", 4, 4, threshold_elevation=0.05, opening_area_m2=1.0)
+    cfg = SimConfig(
+        storm=StormConfig(rainfall_mm_per_hr=60.0, duration_hours=1.0,
+                          drainage_capacity_mm_per_hr=0.0),
+        solver=SolverConfig(total_time_s=300.0, output_interval_s=150.0),
+    )
+    d = str(tmp_path / "run")
+    man = run_scenario(Scenario(grid, cfg, [node], BoundaryType.CLOSED), d)
+    assert man["format_version"] == "2.0"
+    assert man["hazard"]["debris_factor"] == DEBRIS_FACTOR
+    assert man["hazard"]["depth_critical_m"] == DEPTH_CRITICAL_M
+    assert "moderate" in man["hazard"]["hr_bands"]
+    terrain = json.load(open(os.path.join(d, "terrain.json")))
+    assert terrain["mask"][0][0] is False and terrain["mask"][1][1] is True
+    frame = json.load(open(os.path.join(d, "frame_001.json")))
+    assert len(frame["speed"]) == 8 and len(frame["speed"][0]) == 8
 
 
 def test_scenario_triggers_sink_node_alert():

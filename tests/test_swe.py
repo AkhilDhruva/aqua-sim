@@ -78,6 +78,65 @@ def test_obstacle_wall_blocks_flow():
     assert right_water == 0.0  # nothing leaked past the wall
 
 
+def test_interior_obstacle_is_a_wall_under_open_boundary():
+    # Regression: under OPEN boundaries an interior obstacle/masked cell must
+    # still be a wall, NOT an outflow — buildings must never drain the domain.
+    # A bowl (closed by terrain) with one obstacle cell must conserve volume.
+    grid = Grid.empty(12, 12, 5.0, default_manning=0.03)
+    for y in range(12):
+        for x in range(12):
+            # High rim so no water reaches the open domain edge.
+            grid.z[y][x] = 0.0 if 2 <= x <= 9 and 2 <= y <= 9 else 50.0
+    grid.obstacle[5][5] = 20.0  # a building inside the bowl
+    solver = ShallowWaterSolver(grid, _closed_cfg(1200, 600), boundary=BoundaryType.OPEN)
+    init = [[0.0] * 12 for _ in range(12)]
+    for y in range(3, 9):
+        for x in range(3, 9):
+            init[y][x] = 0.5
+    init[5][5] = 0.0  # not on the building
+    states = list(solver.run(initial_depth=init))
+    v0, v1 = states[0].total_volume_m3, states[-1].total_volume_m3
+    assert abs(v1 - v0) / v0 < 1e-9  # building did not swallow any water
+
+
+def test_final_partial_interval_is_yielded():
+    # Regression: total_time_s not a multiple of output_interval_s must still
+    # yield the final state at total_time_s.
+    grid = Grid.empty(6, 6, 5.0)
+    cfg = _closed_cfg(total=500.0, out=120.0, rain=50.0)
+    solver = ShallowWaterSolver(grid, cfg, boundary=BoundaryType.CLOSED)
+    times = [s.time_s for s in solver.run()]
+    assert times[-1] == 500.0
+    assert times[:-1] == [0.0, 120.0, 240.0, 360.0, 480.0]
+
+
+def test_front_speed_stays_physical():
+    # Regression: reported speeds are face-conveyance-referenced, so a dam-break
+    # front must not report wildly super-physical speeds (q / tiny-cell-depth).
+    import math
+    from aqua_sim.config import GRAVITY as G
+    grid = Grid.empty(30, 4, 5.0, default_manning=0.02)
+    solver = ShallowWaterSolver(grid, _closed_cfg(120, 10), boundary=BoundaryType.CLOSED)
+    init = [[0.0] * 30 for _ in range(4)]
+    for y in range(4):
+        for x in range(5):
+            init[y][x] = 2.0
+    states = list(solver.run(initial_depth=init))
+    # Ritter front celerity for a 2 m reservoir is 2*sqrt(g*h) ≈ 8.9 m/s; allow
+    # modest overshoot but nothing like the ~27 m/s the naive q/h estimate gave.
+    assert max(s.max_speed for s in states) < 2.5 * math.sqrt(G * 2.0)
+
+
+def test_unknown_scheme_is_rejected():
+    # Regression: provenance must never record a scheme that did not run.
+    import pytest as _pytest
+    from aqua_sim.config import SimConfig, SolverConfig
+    grid = Grid.empty(4, 4, 5.0)
+    cfg = SimConfig(solver=SolverConfig(scheme="dynamic_swe"))
+    with _pytest.raises(NotImplementedError, match="dynamic_swe"):
+        ShallowWaterSolver(grid, cfg)
+
+
 def test_open_boundary_drains_water():
     grid = Grid.empty(16, 16, 5.0)
     for y in range(16):

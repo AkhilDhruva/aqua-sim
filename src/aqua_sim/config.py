@@ -30,6 +30,11 @@ class StormConfig:
         """Convert user-facing mm/hr into SI m/s for the solver source term."""
         return self.rainfall_mm_per_hr / 1000.0 / 3600.0
 
+    def effective_drainage_m_per_s(self) -> float:
+        """Blockage-adjusted drainage sink in SI m/s — both source terms convert
+        through the same mm/hr→m/s path so the units cannot drift apart."""
+        return self.effective_drainage_mm_per_hr() / 1000.0 / 3600.0
+
 
 @dataclass(frozen=True)
 class SolverConfig:
