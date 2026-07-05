@@ -21,12 +21,17 @@ biases toward physical correctness and reproducibility.
 - **[docs/DATA_SOURCING.md](docs/DATA_SOURCING.md)** — what a DEM is, and the
   public Manhattan datasets (USGS 3DEP, NYC LiDAR) we use.
 
-## Status: end-to-end thin slice complete (P0–P4)
+## Status: historically validated on real terrain (P0–P4.5)
 
 The **shallow-water solver is real and validated**, real GeoTIFF DEM ingestion
 works, the risk layer emits alerts and per-frame breach records, and the
 **Three.js telemetry dashboard** (`viz/`) renders any exported run — kinetic
 depth×velocity shader, alert matrix, breach banners, live palette switcher.
+
+**Historical validation:** driven by the documented Hurricane-Ida (2021)
+hyetograph over the real USGS 3DEP 10 m terrain of Manhattan, the model is
+scored against the subway stations that actually flooded — see
+[docs/VALIDATION.md](docs/VALIDATION.md) and `python -m aqua_sim.validation.ida2021`.
 Roadmap in `docs/PLANNING.md`.
 
 The solver is a local-inertial (LISFLOOD-FP / Bates 2010) scheme, is

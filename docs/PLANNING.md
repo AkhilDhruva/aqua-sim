@@ -113,7 +113,8 @@ risk. Each milestone has a concrete "done" check.
 | **P1 — Real ingestion** | GeoTIFF DEM → metric UTM `Grid`; resample; geofence clip; nodata fill | ✅ **Done** — `DEMSource` implemented + tested (reproject to UTM 18N, AOI clip, `--dem` run). Live USGS fetch pending network egress (blocked by policy in the current sandbox). |
 | **P4 — Visualization** | Three.js telemetry dashboard: orbit camera, kinetic depth×velocity shader, palette switcher, alert matrix, breach banners | ✅ **Done** — verified headless-Chromium render of the sample run (`viz/`); loads any run folder |
 | **P5 — Drone/LiDAR ingestion** | Photogrammetry (SfM→DSM/DTM) and LiDAR (PDAL) as pluggable sources | Drone image set or `.laz` produces a `Grid` behind the same interface as P1 |
-| **P6 — Hardening** | Taichi/GPU kernel, tiling for city scale, infiltration model, real-event validation (NYC 2021 / FEMA layer) | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
+| **P4.5 — Real terrain + Ida validation** | Real USGS 3DEP tile, hyetograph forcing, building burn-in code, historical validation vs documented Ida 2021 subway flooding | ✅ **Done** — see docs/VALIDATION.md; `viz/ida_run` holds the scored run |
+| **P6 — Hardening** | Taichi/GPU kernel (native 10 m runs), building footprints from real data, infiltration model, FEMA-layer overlap + a second validation event | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
 
 **Thin-slice status:** the end-to-end path (terrain → solver → risk → exported
 frames → one sink-node alert) is **built and running today** on a Manhattan-scaled

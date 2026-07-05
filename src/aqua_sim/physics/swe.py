@@ -110,13 +110,13 @@ class ShallowWaterSolver:
     # -- source terms --------------------------------------------------------
 
     def _source_rate(self) -> float:
-        """Net vertical rate (m/s): rainfall minus drainage, active during the storm."""
+        """Net vertical rate (m/s): rainfall minus drainage.
+
+        Rainfall follows the storm's hyetograph when one is set (historical
+        events), otherwise constant intensity for the storm duration.
+        """
         storm = self.config.storm
-        if self.time_s <= storm.duration_hours * 3600.0:
-            rain = storm.rainfall_m_per_s()
-        else:
-            rain = 0.0
-        return rain - storm.effective_drainage_m_per_s()
+        return storm.rainfall_at(self.time_s) - storm.effective_drainage_m_per_s()
 
     # -- one timestep --------------------------------------------------------
 

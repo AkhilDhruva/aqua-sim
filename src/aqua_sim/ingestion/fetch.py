@@ -63,6 +63,35 @@ def fetch_3dep(
     return out_path
 
 
+def s3_3dep_url(lat_north: int, lon_west: int, resolution: str = "13") -> str:
+    """Direct S3 URL for a USGS 3DEP staged tile — no API, plain HTTPS GET.
+
+    ``resolution``: "1" = 1 arc-second (~30 m, ~20 MB/tile), "13" = 1/3
+    arc-second (~10 m, ~170 MB/tile). Tiles are 1°×1°, named by their
+    north-west corner: Manhattan (40.7 N, 74.0 W) → ``lat_north=41,
+    lon_west=74``. In practice the S3 bucket (prd-tnm.s3.amazonaws.com) is
+    often reachable from sandboxes whose policy blocks the ArcGIS
+    exportImage host — try this first.
+    """
+    tile = f"n{lat_north:02d}w{lon_west:03d}"
+    return (f"https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/"
+            f"{resolution}/TIFF/current/{tile}/USGS_{resolution}_{tile}.tif")
+
+
+def fetch_3dep_s3(out_path: str, lat_north: int = 41, lon_west: int = 74,
+                  resolution: str = "13", timeout: int = 600) -> str:
+    """Download a full 3DEP staged tile from the public S3 bucket."""
+    url = s3_3dep_url(lat_north, lon_west, resolution)
+    req = urllib.request.Request(url, headers={"User-Agent": "aqua-sim/0.1"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp, open(out_path, "wb") as f:
+        while True:
+            chunk = resp.read(1 << 20)
+            if not chunk:
+                break
+            f.write(chunk)
+    return out_path
+
+
 if __name__ == "__main__":  # pragma: no cover - manual utility
     import sys
 

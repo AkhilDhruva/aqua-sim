@@ -1,0 +1,145 @@
+{
+  "event": "Hurricane Ida remnants, Manhattan, 2021-09-01",
+  "method": "drainage-state sensitivity matrix (blockage 0 / 0.5 / 1.0)",
+  "pod_by_drainage_blockage": {
+    "0.00": {
+      "probability_of_detection": 0.0,
+      "detected": 0,
+      "documented_flooded": 6,
+      "run_id": "c63cd582e772a0c2",
+      "stations": [
+        {
+          "name": "157 St (1)",
+          "breached": false,
+          "peak_depth_m": 0.014,
+          "first_breach_min": null
+        },
+        {
+          "name": "Dyckman St (1)",
+          "breached": false,
+          "peak_depth_m": 0.041,
+          "first_breach_min": null
+        },
+        {
+          "name": "168 St (1/A/C)",
+          "breached": false,
+          "peak_depth_m": 0.003,
+          "first_breach_min": null
+        },
+        {
+          "name": "28 St (1)",
+          "breached": false,
+          "peak_depth_m": 0.035,
+          "first_breach_min": null
+        },
+        {
+          "name": "96 St (1/2/3)",
+          "breached": false,
+          "peak_depth_m": 0.012,
+          "first_breach_min": null
+        },
+        {
+          "name": "Times Sq-42 St",
+          "breached": false,
+          "peak_depth_m": 0.015,
+          "first_breach_min": null
+        }
+      ]
+    },
+    "0.50": {
+      "probability_of_detection": 0.0,
+      "detected": 0,
+      "documented_flooded": 6,
+      "run_id": "2267d60e471658d9",
+      "stations": [
+        {
+          "name": "157 St (1)",
+          "breached": false,
+          "peak_depth_m": 0.018,
+          "first_breach_min": null
+        },
+        {
+          "name": "Dyckman St (1)",
+          "breached": false,
+          "peak_depth_m": 0.068,
+          "first_breach_min": null
+        },
+        {
+          "name": "168 St (1/A/C)",
+          "breached": false,
+          "peak_depth_m": 0.004,
+          "first_breach_min": null
+        },
+        {
+          "name": "28 St (1)",
+          "breached": false,
+          "peak_depth_m": 0.049,
+          "first_breach_min": null
+        },
+        {
+          "name": "96 St (1/2/3)",
+          "breached": false,
+          "peak_depth_m": 0.016,
+          "first_breach_min": null
+        },
+        {
+          "name": "Times Sq-42 St",
+          "breached": false,
+          "peak_depth_m": 0.02,
+          "first_breach_min": null
+        }
+      ]
+    },
+    "1.00": {
+      "probability_of_detection": 0.167,
+      "detected": 1,
+      "documented_flooded": 6,
+      "run_id": "730ec1d274f5892e",
+      "stations": [
+        {
+          "name": "157 St (1)",
+          "breached": false,
+          "peak_depth_m": 0.022,
+          "first_breach_min": null
+        },
+        {
+          "name": "Dyckman St (1)",
+          "breached": true,
+          "peak_depth_m": 0.094,
+          "first_breach_min": 82.8
+        },
+        {
+          "name": "168 St (1/A/C)",
+          "breached": false,
+          "peak_depth_m": 0.005,
+          "first_breach_min": null
+        },
+        {
+          "name": "28 St (1)",
+          "breached": false,
+          "peak_depth_m": 0.061,
+          "first_breach_min": null
+        },
+        {
+          "name": "96 St (1/2/3)",
+          "breached": false,
+          "peak_depth_m": 0.019,
+          "first_breach_min": null
+        },
+        {
+          "name": "Times Sq-42 St",
+          "breached": false,
+          "peak_depth_m": 0.024,
+          "first_breach_min": null
+        }
+      ]
+    }
+  },
+  "shared_notes": [
+    "POD over documented-flooded stations; FAR requires an authoritative list of non-flooded stations and is out of scope.",
+    "Station coordinates approximate (\u00b1~100 m).",
+    "Hyetograph: peak hour exact (80 mm NWS Central Park record); shoulder hours approximate staircase.",
+    "Buildings NOT burned in (footprint sources unreachable); street-canyon channeling unresolved.",
+    "Tile n41w074 ends at lon -74.0; Battery Park City strip excluded."
+  ]
+}
