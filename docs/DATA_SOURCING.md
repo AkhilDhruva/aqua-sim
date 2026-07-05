@@ -70,10 +70,39 @@ compare simulated inundation extent / flood-prone cells against the observed map
 
 ## 4. How this maps to the code
 
-- **Today:** `scenario.build_manhattan_demo()` uses a *synthetic Manhattan-scaled*
-  terrain (an island with a central ridge and an enclosed low-lying basin) so the
-  full pipeline runs with zero downloads. It is clearly labeled non-georeferenced.
-- **Phase 1 swap-in:** implement `ingestion.DEMSource.load()` to read a USGS 3DEP
-  GeoTIFF tile of the AOI, reproject to UTM 18N, clip to the geofence, and return
-  the same `Grid`. Nothing downstream changes — the solver, risk layer, and
-  exporter already run against `Grid`.
+`ingestion.DEMSource` (Phase 1) is **implemented and tested**. It reads a GeoTIFF,
+reprojects to metric UTM, resamples to a target cell size, clips to a WGS84 AOI
+box, void-fills nodata, and returns the same `Grid` every other source produces —
+so the solver, risk layer, and exporter run against it unchanged.
+
+Install the geospatial extra and run on real terrain:
+
+```bash
+pip install -e ".[geo]"                      # rasterio, numpy, pyproj
+
+# 1. Fetch a public USGS 3DEP tile of Manhattan (needs egress to USGS):
+python -m aqua_sim.ingestion.fetch manhattan_3dep.tif
+
+# 2. Run the full pipeline on it:
+python -m aqua_sim run output/manhattan --dem manhattan_3dep.tif
+```
+
+Or in code:
+
+```python
+from aqua_sim.ingestion.dem import DEMSource
+grid = DEMSource("manhattan_3dep.tif", target_dx_m=10.0,
+                 aoi_bounds=(-74.02, 40.70, -73.93, 40.78)).load()
+# grid.crs == "EPSG:32618" (UTM 18N), grid.dx == 10.0 m, ready for the solver.
+```
+
+**Egress note:** `elevation.nationalmap.gov` may be blocked by a restrictive
+network policy (the egress proxy returns HTTP 403). In that case, fetch the tile
+where outbound access to USGS is allowed and copy the `.tif` in; everything after
+the download runs fully offline.
+
+**Still synthetic (until a real tile is dropped in):**
+`scenario.build_manhattan_demo()` builds a *Manhattan-scaled* terrain (island,
+central ridge, enclosed low-lying basin) so the pipeline demonstrates flooding and
+a subway breach with zero downloads. It is clearly labeled non-georeferenced;
+`build_scenario_from_dem(path, aoi_bounds=...)` is the real-terrain path.

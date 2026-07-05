@@ -105,6 +105,56 @@ _BREACH_HEAD_EPS = 0.02   # m; head above the entrance lip that counts as a brea
 _WARN_APPROACH = 0.15     # m; how close below the lip triggers an early warning
 
 
+def build_scenario_from_dem(
+    dem_path: str,
+    aoi_bounds: tuple[float, float, float, float] | None = None,
+    target_dx_m: float = 30.0,
+    storm: StormConfig | None = None,
+    nodes: list[SinkNode] | None = None,
+    aoi_name: str = "Manhattan (USGS 3DEP)",
+) -> Scenario:
+    """Build a scenario from a real GeoTIFF DEM (see ingestion.DEMSource).
+
+    Requires the ``geo`` extra. Sink nodes, if not supplied, are auto-placed at
+    the lowest in-AOI cells (proxies for flood-prone low points) so the run still
+    produces risk output on real terrain.
+    """
+    from aqua_sim.ingestion.dem import DEMSource
+
+    grid = DEMSource(dem_path, target_dx_m=target_dx_m, aoi_bounds=aoi_bounds).load()
+
+    if nodes is None:
+        nodes = _auto_sink_nodes(grid, count=3)
+
+    storm = storm or StormConfig(rainfall_mm_per_hr=90.0, duration_hours=2.0,
+                                 drainage_capacity_mm_per_hr=15.0, drainage_blockage=0.5)
+    # Scale the run so ~100 frames are produced regardless of grid size.
+    config = SimConfig(
+        storm=storm,
+        solver=SolverConfig(cfl=0.7, total_time_s=7200.0, output_interval_s=72.0),
+        aoi_name=aoi_name,
+    )
+    return Scenario(grid=grid, config=config, nodes=nodes)
+
+
+def _auto_sink_nodes(grid: Grid, count: int = 3) -> list[SinkNode]:
+    """Place sink nodes at the lowest in-AOI cells (illustrative low points)."""
+    cells = [(grid.z[y][x], x, y)
+             for y in range(grid.ny) for x in range(grid.nx) if grid.mask[y][x]]
+    cells.sort(key=lambda c: c[0])
+    nodes = []
+    used: list[tuple[int, int]] = []
+    for z, x, y in cells:
+        if all(abs(x - ux) + abs(y - uy) > max(grid.nx, grid.ny) // 6 for ux, uy in used):
+            used.append((x, y))
+            nodes.append(SinkNode(f"Low Point {len(nodes)+1}", x=x, y=y,
+                                  threshold_elevation=z + 0.2,
+                                  opening_area_m2=4.0, capacity_m3=3000.0))
+        if len(nodes) >= count:
+            break
+    return nodes
+
+
 def _evaluate_alerts(scenario: Scenario, states):
     """Scan frames for hazard escalation and sink-node breaches.
 

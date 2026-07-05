@@ -44,14 +44,20 @@ def _self_check() -> int:
     return 0
 
 
-def _run(out_dir: str) -> int:
-    from aqua_sim.scenario import build_manhattan_demo, run_scenario
+def _run(out_dir: str, dem_path: str | None = None) -> int:
+    from aqua_sim.scenario import (build_manhattan_demo,
+                                   build_scenario_from_dem, run_scenario)
 
-    print(f"aqua-sim v{__version__} — running Manhattan demo scenario...")
-    sc = build_manhattan_demo()
+    if dem_path:
+        print(f"aqua-sim v{__version__} — running scenario from DEM: {dem_path}")
+        sc = build_scenario_from_dem(dem_path)
+    else:
+        print(f"aqua-sim v{__version__} — running Manhattan demo scenario (synthetic)...")
+        sc = build_manhattan_demo()
     manifest = run_scenario(sc, out_dir)
     print(f"  grid: {sc.grid.nx}x{sc.grid.ny} @ {sc.grid.dx} m  [{sc.grid.crs}]")
     print(f"  frames: {manifest['frame_count']}  peak depth: {manifest['peak_depth_m']} m")
+    print(f"  run_id: {manifest['run_id']}")
     print(f"  wrote run to: {out_dir}/  (manifest.json, frame_NNN.json, alerts.json)")
     return 0
 
@@ -59,8 +65,14 @@ def _run(out_dir: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if args and args[0] == "run":
-        out = args[1] if len(args) > 1 else "output/manhattan_run"
-        return _run(out)
+        rest = args[1:]
+        dem_path = None
+        if "--dem" in rest:
+            i = rest.index("--dem")
+            dem_path = rest[i + 1] if i + 1 < len(rest) else None
+            rest = rest[:i] + rest[i + 2:]
+        out = rest[0] if rest else "output/manhattan_run"
+        return _run(out, dem_path=dem_path)
     return _self_check()
 
 

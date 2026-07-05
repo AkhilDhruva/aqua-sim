@@ -45,6 +45,14 @@ python -m aqua_sim run output/run  # full Manhattan demo: solver -> risk -> fram
 pytest                             # test suite (physics validation + end-to-end)
 ```
 
+Run on a **real DEM** (adds rasterio/numpy/pyproj):
+
+```bash
+pip install -e ".[geo]"
+python -m aqua_sim.ingestion.fetch manhattan_3dep.tif        # USGS 3DEP (needs egress)
+python -m aqua_sim run output/mn --dem manhattan_3dep.tif    # reproject -> solve -> frames
+```
+
 A run writes `manifest.json` (with a provenance block), `terrain.json`,
 `frame_001.json … frame_NNN.json`, and `alerts.json` into the output folder.
 
@@ -61,7 +69,8 @@ aqua-sim/
 │   ├── ingestion/            # 1. terrain sources → Grid
 │   │   ├── base.py           #    TerrainSource contract
 │   │   ├── synthetic.py      #    real, dependency-free test terrain (Phase 0)
-│   │   ├── dem.py            #    GeoTIFF DEM        (Phase 1)
+│   │   ├── dem.py            #    GeoTIFF DEM -> UTM Grid  (real, tested)
+│   │   ├── fetch.py         #    download USGS 3DEP tiles (real)
 │   │   ├── lidar.py         #    LiDAR .las/.laz    (Phase 5)
 │   │   └── photogrammetry.py #    drone SfM          (Phase 5)
 │   ├── physics/              # 2. shallow-water solver
