@@ -7,4 +7,4 @@ def test_version():
 
 
 def test_main_runs():
-    assert main() == 0
+    assert main([]) == 0

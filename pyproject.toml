@@ -5,12 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aqua-sim"
 version = "0.1.0"
-description = "Water/aquatic simulation project"
+description = "Flood Zone Risk Simulator — shallow-water flood modeling from DEM/LiDAR"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# Real DEM/LiDAR ingestion (Phase 1+). The dependency-free core (config, grid,
+# solver, risk, export) runs without these; DEMSource imports them lazily.
+# (Affine transforms come via rasterio.transform; no direct pyproj/affine use.)
+geo = ["numpy>=1.24", "rasterio>=1.3"]
 
 [project.scripts]
 aqua-sim = "aqua_sim.main:main"

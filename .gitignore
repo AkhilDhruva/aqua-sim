@@ -25,3 +25,4 @@ Thumbs.db
 # Simulation outputs
 output/
 *.log
+viz/ida_run/
