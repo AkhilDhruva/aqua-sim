@@ -83,7 +83,8 @@ class SolverConfig:
     min_depth: float = 1e-4    # m; below this a cell is treated as dry
     total_time_s: float = 3600.0
     output_interval_s: float = 30.0
-    scheme: str = "local_inertial"  # or "dynamic_swe" (high-fidelity mode)
+    scheme: str = "local_inertial"  # validated against physics.swe.SUPPORTED_SCHEMES
+    backend: str = "auto"      # 'auto' | 'numpy' | 'reference' (see physics.swe_numpy)
 
 
 @dataclass

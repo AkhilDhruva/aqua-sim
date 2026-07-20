@@ -43,6 +43,19 @@ def hazard_rating(depth: float, speed: float, debris_factor: float = DEBRIS_FACT
     return depth * (max(speed, 0.0) + debris_factor)
 
 
+def classify_rating(hr: float) -> HazardClass:
+    """Map an already-computed hazard rating HR to its band."""
+    if hr <= 0:
+        return HazardClass.NONE
+    if hr < HR_BANDS["low"]:
+        return HazardClass.LOW
+    if hr < HR_BANDS["moderate"]:
+        return HazardClass.MODERATE
+    if hr < HR_BANDS["significant"]:
+        return HazardClass.SIGNIFICANT
+    return HazardClass.EXTREME
+
+
 def classify_hazard(depth: float, speed: float, debris_factor: float = DEBRIS_FACTOR) -> HazardClass:
     """Map a cell's depth and speed to a :class:`HazardClass`.
 
@@ -51,11 +64,4 @@ def classify_hazard(depth: float, speed: float, debris_factor: float = DEBRIS_FA
     """
     if depth <= 0:
         return HazardClass.NONE
-    hr = hazard_rating(depth, speed, debris_factor)
-    if hr < HR_BANDS["low"]:
-        return HazardClass.LOW
-    if hr < HR_BANDS["moderate"]:
-        return HazardClass.MODERATE
-    if hr < HR_BANDS["significant"]:
-        return HazardClass.SIGNIFICANT
-    return HazardClass.EXTREME
+    return classify_rating(hazard_rating(depth, speed, debris_factor))

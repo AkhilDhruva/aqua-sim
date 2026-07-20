@@ -40,7 +40,13 @@ FORMAT_VERSION = "2.0"
 
 
 def _round_grid(matrix, ndigits: int = 4):
-    return [[round(v, ndigits) for v in row] for row in matrix]
+    # Vectorized when numpy is present: pure-Python round() over a metro-scale
+    # grid costs ~0.75 s per matrix per frame; np.round + tolist is ~50x faster.
+    try:
+        import numpy as np
+        return np.round(np.asarray(matrix, dtype=float), ndigits).tolist()
+    except ImportError:
+        return [[round(v, ndigits) for v in row] for row in matrix]
 
 
 def _representative_manning(grid: Grid) -> float:
@@ -87,6 +93,7 @@ def write_run(
     alerts: Union[list[dict], Callable[[], list[dict]], None] = None,
     frame_breaches: list[list[dict]] | None = None,
     nodes: list[dict] | None = None,
+    solver_backend: str | None = None,
 ) -> dict:
     """Serialize a completed run to ``run_dir``. Returns the manifest dict.
 
@@ -131,6 +138,10 @@ def write_run(
             "cfl": config.solver.cfl,
             "total_time_s": config.solver.total_time_s,
             "output_interval_s": config.solver.output_interval_s,
+            # The RESOLVED backend ('auto' resolves per-environment; two
+            # environments can differ at float-noise level, so the run must
+            # record which one actually produced it).
+            "backend": solver_backend or config.solver.backend,
         },
         "terrain_meta": grid.meta,
     }
