@@ -40,7 +40,13 @@ FORMAT_VERSION = "2.0"
 
 
 def _round_grid(matrix, ndigits: int = 4):
-    return [[round(v, ndigits) for v in row] for row in matrix]
+    # Vectorized when numpy is present: pure-Python round() over a metro-scale
+    # grid costs ~0.75 s per matrix per frame; np.round + tolist is ~50x faster.
+    try:
+        import numpy as np
+        return np.round(np.asarray(matrix, dtype=float), ndigits).tolist()
+    except ImportError:
+        return [[round(v, ndigits) for v in row] for row in matrix]
 
 
 def _representative_manning(grid: Grid) -> float:
@@ -53,13 +59,18 @@ def _representative_manning(grid: Grid) -> float:
 
 
 def _terrain_digest(grid: Grid) -> str:
-    """SHA-256 over the elevation and obstacle content (mm precision).
+    """SHA-256 over the elevation, obstacle, and building-coverage content.
 
     Two different terrains at the same file path get different digests — so the
     run id genuinely covers *what* was simulated, not just where it came from.
+    Coverage is included so screening-resolution building runs (which add no
+    obstacle cells) still produce distinct run ids when the buildings differ.
     """
     hasher = hashlib.sha256()
-    for matrix in (grid.z, grid.obstacle):
+    matrices = [grid.z, grid.obstacle]
+    if grid.coverage is not None:
+        matrices.append(grid.coverage)
+    for matrix in matrices:
         for row in matrix:
             hasher.update(",".join(f"{v:.3f}" for v in row).encode())
             hasher.update(b";")
@@ -87,6 +98,7 @@ def write_run(
     alerts: Union[list[dict], Callable[[], list[dict]], None] = None,
     frame_breaches: list[list[dict]] | None = None,
     nodes: list[dict] | None = None,
+    solver_backend: str | None = None,
 ) -> dict:
     """Serialize a completed run to ``run_dir``. Returns the manifest dict.
 
@@ -105,13 +117,15 @@ def write_run(
     # Static terrain (loaded once by the viewer). The mask matters: DEM ingestion
     # void-fills nodata cells, and only the mask tells the viewer they are not
     # real terrain.
+    terrain_doc = {"nx": grid.nx, "ny": grid.ny, "dx": grid.dx,
+                   "z": _round_grid(grid.z, 3), "obstacle": _round_grid(grid.obstacle, 2),
+                   "mask": [[bool(v) for v in row] for row in grid.mask]}
+    if grid.coverage is not None:
+        # Building coverage fraction (screening-resolution runs export this
+        # instead of binary obstacles; see ingestion.buildings.apply_buildings).
+        terrain_doc["coverage"] = _round_grid(grid.coverage, 3)
     with open(os.path.join(run_dir, "terrain.json"), "w") as f:
-        json.dump(
-            {"nx": grid.nx, "ny": grid.ny, "dx": grid.dx,
-             "z": _round_grid(grid.z, 3), "obstacle": _round_grid(grid.obstacle, 2),
-             "mask": [[bool(v) for v in row] for row in grid.mask]},
-            f,
-        )
+        json.dump(terrain_doc, f)
 
     # Provenance is computed up front so every frame can carry the run id.
     provenance = {
@@ -131,6 +145,10 @@ def write_run(
             "cfl": config.solver.cfl,
             "total_time_s": config.solver.total_time_s,
             "output_interval_s": config.solver.output_interval_s,
+            # The RESOLVED backend ('auto' resolves per-environment; two
+            # environments can differ at float-noise level, so the run must
+            # record which one actually produced it).
+            "backend": solver_backend or config.solver.backend,
         },
         "terrain_meta": grid.meta,
     }

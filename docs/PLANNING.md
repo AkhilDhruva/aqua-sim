@@ -112,7 +112,8 @@ risk. Each milestone has a concrete "done" check.
 | **P3.5 — Frame export** | Provenance-rich `manifest.json` + `frame_NNN.json` + `alerts.json` | ✅ **Done** — `python -m aqua_sim run OUTDIR` writes a full run folder |
 | **P1 — Real ingestion** | GeoTIFF DEM → metric UTM `Grid`; resample; geofence clip; nodata fill | ✅ **Done** — `DEMSource` implemented + tested (reproject to UTM 18N, AOI clip, `--dem` run). Live USGS fetch pending network egress (blocked by policy in the current sandbox). |
 | **P4 — Visualization** | Three.js telemetry dashboard: orbit camera, kinetic depth×velocity shader, palette switcher, alert matrix, breach banners | ✅ **Done** — verified headless-Chromium render of the sample run (`viz/`); loads any run folder |
-| **P5 — Drone/LiDAR ingestion** | Photogrammetry (SfM→DSM/DTM) and LiDAR (PDAL) as pluggable sources | Drone image set or `.laz` produces a `Grid` behind the same interface as P1 |
+| **P5a — Building-aware urban runs** | Official NYC Building Footprints (nqwf-w8eh) → metric, provenance-stamped ingestion; closed no-flow cells at ≤10 m; coverage-fraction export at screening resolution; tiled/LOD viewer layer with per-building flood stats | ✅ **Done** — 5,744-building Lower Manhattan 8 m run routes water through the street network |
+| **P5b — Drone/LiDAR ingestion** | Photogrammetry (SfM→DSM/DTM) and LiDAR (PDAL) as pluggable sources | Drone image set or `.laz` produces a `Grid` behind the same interface as P1 |
 | **P4.5 — Real terrain + Ida validation** | Real USGS 3DEP tile, hyetograph forcing, building burn-in code, historical validation vs documented Ida 2021 subway flooding | ✅ **Done** — see docs/VALIDATION.md; `viz/ida_run` holds the scored run |
 | **P6 — Hardening** | Taichi/GPU kernel (native 10 m runs), building footprints from real data, infiltration model, FEMA-layer overlap + a second validation event | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
 
@@ -147,8 +148,10 @@ a real Manhattan DEM (P1) and building the browser viewer (P4).
 
 ## 7. How to contribute / next action
 
-Next action is **P1**: implement the GeoTIFF → `Grid` loader against the
-`TerrainSource` contract stubbed in `src/aqua_sim/ingestion/`. The synthetic
-source (`ingestion/synthetic.py`) already implements that contract with zero
-dependencies, so P2's solver can be developed and tested before any real data
-arrives.
+P0–P4.5 are **done** (see the roadmap table): validated solver + NumPy backend,
+real DEM ingestion with mosaicking, risk layer, telemetry dashboard, Ida-2021
+historical validation, five-borough stress runs, and building-aware fine runs
+from the official NYC footprints dataset. The open work is **P6 hardening**:
+Taichi/GPU kernel, subgrid porosity for screening-resolution buildings,
+infiltration, binary frame format, land-cover-aware roughness/node placement,
+and the second validation event.

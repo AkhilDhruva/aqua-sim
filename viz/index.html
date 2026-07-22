@@ -50,6 +50,21 @@
   .a-row .a-t { color:var(--muted); }
   .a-row .a-msg { font-size:11px; color:var(--ink); }
   .a-none { color:var(--muted); }
+  /* layers + presets + building info */
+  .lyr-grid { display:flex; flex-direction:column; gap:5px; font-size:12px; }
+  .lyr-grid label { display:flex; align-items:center; gap:7px; cursor:pointer; }
+  .lyr-grid .lyr-off { color:var(--muted); cursor:help; }
+  .lyr-note { color:var(--muted); font-size:10px; margin-left:auto; }
+  .preset-row { display:flex; flex-wrap:wrap; gap:6px; }
+  .preset-row button { background:#17223a; color:var(--ink); border:1px solid var(--line);
+    border-radius:5px; padding:4px 9px; font:inherit; font-size:11px; cursor:pointer; }
+  .preset-row button:hover { border-color:var(--accent); }
+  #bInfo { margin-top:12px; padding:9px 10px; background:var(--panel2);
+    border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:4px; font-size:11px; line-height:1.6; }
+  .hz-none { color:var(--muted); } .hz-low { color:#3fbf6f; }
+  .hz-moderate { color:#f5a623; } .hz-significant { color:#ff7043; }
+  .hz-extreme { color:#ff2b45; font-weight:700; }
   /* legend */
   #legendBar { height:14px; border-radius:3px; border:1px solid var(--line); }
   .legend-labels { display:flex; justify-content:space-between; color:var(--muted);
@@ -86,6 +101,20 @@
   </div>
 
   <aside>
+    <h2>Layers</h2>
+    <div class="lyr-grid">
+      <label><input type="checkbox" id="lyrTerrain" checked /> Terrain</label>
+      <label><input type="checkbox" id="lyrBuildings" checked /> Buildings
+        <span id="bCount" class="lyr-note"></span></label>
+      <label><input type="checkbox" id="lyrWater" checked /> Water</label>
+      <label><input type="checkbox" id="lyrSensors" checked /> Sensors</label>
+      <label class="lyr-off" title="Optional streamed basemap. Requires a Google Maps Platform key and live attribution; never feeds the solver or exports. Not enabled in this build."><input type="checkbox" disabled /> Photorealistic basemap <span class="lyr-note">(off — needs API key)</span></label>
+    </div>
+
+    <div id="presetsWrap"><h2>Camera presets</h2><div id="presets" class="preset-row"></div></div>
+
+    <div id="bInfo" style="display:none"></div>
+
     <h2>Water color ramp</h2>
     <div class="grp"><select id="paletteSel" style="flex:1"></select></div>
     <div id="legendBar" style="margin-top:8px"></div>

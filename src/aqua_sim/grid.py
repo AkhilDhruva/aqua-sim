@@ -54,6 +54,9 @@ class Grid:
     crs: Optional[str] = None
     transform: Optional[tuple[float, float, float, float, float, float]] = None
     meta: dict[str, Any] = field(default_factory=dict)
+    #: Optional per-cell building coverage fraction [0..1] (set by
+    #: ingestion.buildings.apply_buildings; exported to terrain.json).
+    coverage: Optional[Matrix] = None
 
     @classmethod
     def empty(cls, nx: int, ny: int, dx: float, default_manning: float = 0.03) -> "Grid":

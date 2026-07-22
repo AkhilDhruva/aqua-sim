@@ -19,7 +19,6 @@ from aqua_sim.config import SimConfig, SolverConfig, StormConfig
 from aqua_sim.export.frames import write_run
 from aqua_sim.grid import Grid
 from aqua_sim.physics.boundary import BoundaryType
-from aqua_sim.physics.swe import ShallowWaterSolver
 from aqua_sim.risk.alerts import AlertLog, Severity
 from aqua_sim.risk.hazard import HazardClass, classify_hazard
 from aqua_sim.risk.sink_nodes import SinkNode, orifice_inflow, time_to_fill
@@ -136,8 +135,54 @@ def build_scenario_from_dem(
     return Scenario(grid=grid, config=config, nodes=nodes)
 
 
+#: Five-borough New York City bounding box (WGS84): Staten Island to the Bronx.
+NYC_METRO_BBOX = (-74.26, 40.49, -73.70, 40.92)
+
+
+def build_nyc_metro_scenario(
+    dem_paths: list[str],
+    target_dx_m: float = 30.0,
+    storm: StormConfig | None = None,
+    nodes: list[SinkNode] | None = None,
+    max_cells: int = 4_000_000,
+    output_frames: int = 48,
+    sim_hours: float = 6.0,
+) -> Scenario:  # noqa: D401 — note: yields output_frames + 1 states (t=0 + one
+    # per interval; a trailing partial interval adds one more).
+    """Full New York City metro stress scenario — the skyscraper-metropolis test.
+
+    Ingests the real USGS 3DEP tiles covering all five boroughs (the AOI
+    straddles the n41w074/n41w075 tile seam, hence the mosaic), places sink
+    nodes at the deepest in-AOI low points unless supplied, and defaults to a
+    100-year-class cloudburst. Requires the NumPy backend at metro scale —
+    ``max_cells`` is raised accordingly.
+    """
+    from aqua_sim.ingestion.dem import DEMSource
+
+    grid = DEMSource(dem_paths, target_dx_m=target_dx_m,
+                     aoi_bounds=NYC_METRO_BBOX, max_cells=max_cells).load()
+    if nodes is None:
+        nodes = _auto_sink_nodes(grid, count=8)
+    storm = storm or StormConfig(rainfall_mm_per_hr=80.0, duration_hours=2.0,
+                                 drainage_capacity_mm_per_hr=44.0,
+                                 drainage_blockage=0.5)
+    total_s = sim_hours * 3600.0
+    config = SimConfig(
+        storm=storm,
+        solver=SolverConfig(cfl=0.7, total_time_s=total_s,
+                            output_interval_s=total_s / output_frames),
+        aoi_name=f"New York City metro (five boroughs) — screening resolution {target_dx_m:.0f} m",
+    )
+    return Scenario(grid=grid, config=config, nodes=nodes)
+
+
 def _auto_sink_nodes(grid: Grid, count: int = 3) -> list[SinkNode]:
-    """Place sink nodes at the lowest in-AOI cells (illustrative low points)."""
+    """Place sink nodes at the lowest in-AOI cells (illustrative low points).
+
+    Caveat: with no land-cover layer, "lowest cells" in a coastal metro are
+    often open water (harbor, rivers) — fine for a stress demo, but supply
+    real asset locations for anything evaluative.
+    """
     cells = [(grid.z[y][x], x, y)
              for y in range(grid.ny) for x in range(grid.nx) if grid.mask[y][x]]
     cells.sort(key=lambda c: c[0])
@@ -186,12 +231,30 @@ class _AlertScanner:
         dt = state.time_s - self._prev_t
         self._prev_t = state.time_s
         # Track the worst depth-velocity hazard reached anywhere in the domain.
-        for y in range(grid.ny):
-            row_d, row_s = state.depth[y], state.speed[y]
-            for x in range(grid.nx):
-                hz = classify_hazard(row_d[x], row_s[x])
-                if hz > self._peak_hazard:
-                    self._peak_hazard, self._peak_hazard_time = hz, state.time_s
+        # Vectorized when numpy is present (city-scale grids make the pure-Python
+        # scan the bottleneck); the fallback loop is the readable specification.
+        vectorized = False
+        try:
+            import numpy as _np
+            from aqua_sim.risk.hazard import DEBRIS_FACTOR, classify_rating
+            d = _np.asarray(state.depth)
+            s = _np.asarray(state.speed)
+            wet = d > 0.0
+            peak_hr = (float((d * (_np.maximum(s, 0.0) + DEBRIS_FACTOR) * wet).max())
+                       if wet.any() else 0.0)
+            hz = classify_rating(peak_hr)
+            if hz > self._peak_hazard:
+                self._peak_hazard, self._peak_hazard_time = hz, state.time_s
+            vectorized = True
+        except ImportError:
+            pass
+        if not vectorized:
+            for y in range(grid.ny):
+                row_d, row_s = state.depth[y], state.speed[y]
+                for x in range(grid.nx):
+                    hz = classify_hazard(row_d[x], row_s[x])
+                    if hz > self._peak_hazard:
+                        self._peak_hazard, self._peak_hazard_time = hz, state.time_s
 
         events: list[dict] = []
         for node in self.nodes:
@@ -255,7 +318,9 @@ def run_scenario(scenario: Scenario, run_dir: str) -> dict:
     Fully streaming: each frame is risk-scanned and written as the solver yields
     it, so memory stays O(one frame) regardless of run length or grid size.
     """
-    solver = ShallowWaterSolver(scenario.grid, scenario.config, boundary=scenario.boundary)
+    from aqua_sim.physics.swe_numpy import make_solver
+    solver = make_solver(scenario.grid, scenario.config, boundary=scenario.boundary,
+                         backend=scenario.config.solver.backend)
     scanner = _AlertScanner(scenario)
 
     def stream():
@@ -268,4 +333,5 @@ def run_scenario(scenario: Scenario, run_dir: str) -> dict:
              for n in scenario.nodes]
     return write_run(run_dir, scenario.grid, stream(), scenario.config,
                      alerts=scanner.records,  # evaluated after the last frame
-                     frame_breaches=scanner.frame_breaches, nodes=nodes)
+                     frame_breaches=scanner.frame_breaches, nodes=nodes,
+                     solver_backend=type(solver).__name__)
