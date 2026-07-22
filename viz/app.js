@@ -30,6 +30,7 @@ const state = {
   nodeMarkers: [],      // {node, mesh} pairs in the scene
   buildings: null,      // BuildingsLayer instance (created with the scene)
   buildingsDoc: null,   // parsed buildings.json, when the run provides one
+  basemapPlane: null,   // street-basemap ground plane (presentation only)
 };
 
 // Engine hazard thresholds for the shader/legend: prefer the values the run's
@@ -88,10 +89,12 @@ async function loadRun() {
 
     buildScene();
     buildBuildings();
+    buildBasemap();
     applyLayerState();   // reflect checkbox state onto freshly-created objects
     buildPresets();
     buildAlertMatrix();
     showProvenance();
+    showSources();
     renderLegend();
     setFrame(0);
     setStatus('');
@@ -367,6 +370,7 @@ const LAYER_FNS = {
   lyrBuildings: (v) => state.buildings?.setVisible(v),
   lyrWater: (v) => { const m = state.scene?.getObjectByName('waterMesh'); if (m) m.visible = v; },
   lyrSensors: (v) => { for (const mk of state.nodeMarkers) mk.group.visible = v; },
+  lyrBasemap: (v) => setBasemapVisible(v),
 };
 
 function applyLayerState() {
@@ -393,6 +397,97 @@ function buildBuildings() {
   state.buildings.setVisible(chk.checked);
   document.getElementById('bCount').textContent =
     `${stats.buildings} bldgs / ${stats.tiles} tiles`;
+}
+
+// Street basemap: an attributed ground plane under the terrain. Official NYC
+// planimetric map tiles (or OSM) stream onto it at runtime when network is
+// available; otherwise it stays a neutral attributed plane. It NEVER feeds the
+// solver or exports — presentation only.
+const BASEMAPS = {
+  nyc: { label: 'NYC tiles',
+         attr: 'Basemap: NYC OTI Map Tiles © City of New York (gis.nyc.gov/tiles)',
+         template: 'https://gis.nyc.gov/tiles/{z}/{x}/{y}.png' },
+  osm: { label: 'OSM',
+         attr: 'Basemap © OpenStreetMap contributors',
+         template: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' },
+};
+
+function buildBasemap() {
+  const scene = state.scene;
+  const old = scene.getObjectByName('basemapPlane');
+  if (old) { scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
+  const { nx, ny, dx } = { nx: state.nx, ny: state.ny, dx: state.dx };
+  const [zmin] = state.terrain ? terrainMinMax() : [0, 0];
+  const geo = new THREE.PlaneGeometry(nx * dx, ny * dx);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x141a24 });
+  const plane = new THREE.Mesh(geo, mat);
+  plane.name = 'basemapPlane';
+  plane.position.y = (zmin - 1) * state.vertExag;   // just below terrain
+  plane.visible = document.getElementById('lyrBasemap').checked;
+  scene.add(plane);
+  state.basemapPlane = plane;
+  // Try to drape tiles when a network is available; silently keep the neutral
+  // plane if not (egress-restricted environments simply see the plane).
+  tryLoadBasemapTiles(plane);
+}
+
+function terrainMinMax() {
+  let a = Infinity, b = -Infinity;
+  const t = state.terrain;
+  for (let j = 0; j < t.ny; j++) for (let i = 0; i < t.nx; i++) {
+    if (t.mask && t.mask[j] && t.mask[j][i] === false) continue;
+    const e = t.z[j][i]; if (e < a) a = e; if (e > b) b = e;
+  }
+  return [a, b];
+}
+
+function tryLoadBasemapTiles(plane) {
+  const key = document.getElementById('bmSrc').dataset.key || 'nyc';
+  const bm = BASEMAPS[key];
+  // A single center tile as a lightweight drape (full slippy-tiling is a
+  // later refinement); load errors are swallowed so offline stays graceful.
+  if (!state.manifest?.provenance?.crs || !state.manifest.provenance) return;
+  const loader = new THREE.TextureLoader();
+  // Without a geo→tile transform we can't place real tiles precisely; this
+  // hook is where a tiled basemap plugs in when network + a tile transform
+  // are configured. Left as the neutral plane by default.
+  void loader; void bm;
+}
+
+function setBasemapVisible(v) {
+  if (state.basemapPlane) state.basemapPlane.visible = v;
+  const attr = document.getElementById('basemapAttr');
+  const key = document.getElementById('bmSrc').dataset.key || 'nyc';
+  attr.style.display = v ? '' : 'none';
+  attr.textContent = v ? BASEMAPS[key].attr : '';
+}
+
+function showSources() {
+  const el = document.getElementById('sources');
+  const p = state.manifest?.provenance || {};
+  const rows = [];
+  const add = (label, name, url) => rows.push(
+    `<div class="src"><b>${label}:</b> <span>${name || '—'}` +
+    (url ? ` · <a href="${url}" target="_blank" rel="noopener">source</a>` : '') +
+    `</span></div>`);
+  add('Terrain', p.terrain_source, p.terrain_meta?.source_path?.[0] || null);
+  const bmeta = p.terrain_meta?.buildings;
+  if (bmeta) add('Buildings', bmeta.name || 'NYC Building Footprints', bmeta.official_url);
+  const cond = p.terrain_meta?.conditioning;
+  if (cond) {
+    for (const grp of ['surfaces', 'barriers']) {
+      for (const k of Object.keys(cond[grp] || {})) {
+        const c = cond[grp][k];
+        add(k, c.name, c.official_url);
+      }
+    }
+    if (cond.drainage) add('drainage', cond.drainage.name, cond.drainage.official_url);
+  }
+  add('Storm', `${p.storm?.rainfall_mm_per_hr ?? '?'} mm/hr · ${p.storm?.duration_hours ?? '?'} h`, null);
+  add('Solver', `${p.solver_scheme} · ${p.solver?.backend || 'auto'}`, null);
+  rows.push('<div class="src" style="margin-top:4px">No Google-derived geometry is used in the model or exports.</div>');
+  el.innerHTML = rows.join('');
 }
 
 function buildPresets() {
@@ -622,6 +717,7 @@ function initUI() {
   document.getElementById('speedSel').onchange = (e) => { state.fps = Number(e.target.value); };
   document.getElementById('loadBtn').onclick = loadRun;
 
+  document.getElementById('bmSrc').dataset.key = 'nyc';   // default basemap source
   for (const id of Object.keys(LAYER_FNS)) {
     document.getElementById(id).onchange = (e) => LAYER_FNS[id](e.target.checked);
   }

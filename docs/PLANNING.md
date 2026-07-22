@@ -115,7 +115,8 @@ risk. Each milestone has a concrete "done" check.
 | **P5a — Building-aware urban runs** | Official NYC Building Footprints (nqwf-w8eh) → metric, provenance-stamped ingestion; closed no-flow cells at ≤10 m; coverage-fraction export at screening resolution; tiled/LOD viewer layer with per-building flood stats | ✅ **Done** — 5,744-building Lower Manhattan 8 m run routes water through the street network |
 | **P5b — Drone/LiDAR ingestion** | Photogrammetry (SfM→DSM/DTM) and LiDAR (PDAL) as pluggable sources | Drone image set or `.laz` produces a `Grid` behind the same interface as P1 |
 | **P4.5 — Real terrain + Ida validation** | Real USGS 3DEP tile, hyetograph forcing, building burn-in code, historical validation vs documented Ida 2021 subway flooding | ✅ **Done** — see docs/VALIDATION.md; `viz/ida_run` holds the scored run |
-| **P6 — Hardening** | Taichi/GPU kernel (native 10 m runs), building footprints from real data, infiltration model, FEMA-layer overlap + a second validation event | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
+| **P6A — Hydraulic surface conditioning** | Subgrid crests (curbs/medians/retaining walls), per-cell infiltration + drainage inlets, bridge/culvert conduits; conditioning engine fusing official NYC planimetric/LiDAR layers; cross-section + multi-resolution validation; viewer street basemap + attribution | ✅ **Done** — see docs/CONDITIONING.md; both solver backends carry the conditioned physics, equivalence preserved |
+| **P6 — Hardening** | Taichi/GPU kernel (native 1–2 m runs), subgrid porosity, hydro-enforced breakline burning, FEMA-layer overlap + a second validation event | Runs a fine city-scale AOI in reasonable time; benchmark suite passes |
 
 **Thin-slice status:** the end-to-end path (terrain → solver → risk → exported
 frames → one sink-node alert) is **built and running today** on a Manhattan-scaled

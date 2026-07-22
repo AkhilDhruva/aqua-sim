@@ -57,6 +57,30 @@ class Grid:
     #: Optional per-cell building coverage fraction [0..1] (set by
     #: ingestion.buildings.apply_buildings; exported to terrain.json).
     coverage: Optional[Matrix] = None
+    #: Optional per-cell road/pavement coverage fraction [0..1] (conditioning).
+    road_coverage: Optional[Matrix] = None
+
+    # --- Phase 6A conditioned-hydraulic-surface fields (all optional) ---------
+    # These are populated by ingestion.conditioning; when all are None the
+    # solver runs its original code path (bit-identical to a bare-DTM run).
+    #: Per-cell infiltration rate (m/s) and total capacity (m). Green-Ampt-ish:
+    #: water infiltrates at the rate until the cumulative reaches capacity.
+    infiltration_rate: Optional[Matrix] = None
+    infiltration_capacity: Optional[Matrix] = None
+    #: Per-cell drainage-inlet sink capacity (m/s) — removes standing water up
+    #: to this rate (storm-drain inlets). Supersedes the scalar storm drainage
+    #: where present.
+    drainage: Optional[Matrix] = None
+    #: Subgrid barrier crest elevation (m, absolute) at each cell face; a face
+    #: only conveys flow once the water surface tops the crest. ``crest_x`` has
+    #: shape ny×(nx+1) (vertical faces), ``crest_y`` (ny+1)×nx (horizontal).
+    #: ``None`` / a value at or below the bed means "no barrier".
+    crest_x: Optional[Matrix] = None
+    crest_y: Optional[Matrix] = None
+    #: Bridge/culvert conduits linking (possibly non-adjacent) cells so flow
+    #: passes a barrier/embankment instead of falsely damming: list of
+    #: ``(x1, y1, x2, y2, cd_area)`` where cd_area = Cd·A (m²) sets conveyance.
+    connections: Optional[list[tuple[int, int, int, int, float]]] = None
 
     @classmethod
     def empty(cls, nx: int, ny: int, dx: float, default_manning: float = 0.03) -> "Grid":

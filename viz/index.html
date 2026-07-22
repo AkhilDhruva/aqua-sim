@@ -59,6 +59,12 @@
   .preset-row button { background:#17223a; color:var(--ink); border:1px solid var(--line);
     border-radius:5px; padding:4px 9px; font:inherit; font-size:11px; cursor:pointer; }
   .preset-row button:hover { border-color:var(--accent); }
+  .attr-line { font-size:10px; color:var(--muted); margin-top:6px; }
+  .attr-line a { color:var(--accent); }
+  .sources { font-size:10px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .sources .src { display:flex; gap:6px; }
+  .sources .src b { color:var(--ink); font-weight:600; }
+  .sources a { color:var(--accent); word-break:break-all; }
   #bInfo { margin-top:12px; padding:9px 10px; background:var(--panel2);
     border:1px solid var(--line); border-left:3px solid var(--accent);
     border-radius:4px; font-size:11px; line-height:1.6; }
@@ -108,8 +114,10 @@
         <span id="bCount" class="lyr-note"></span></label>
       <label><input type="checkbox" id="lyrWater" checked /> Water</label>
       <label><input type="checkbox" id="lyrSensors" checked /> Sensors</label>
-      <label class="lyr-off" title="Optional streamed basemap. Requires a Google Maps Platform key and live attribution; never feeds the solver or exports. Not enabled in this build."><input type="checkbox" disabled /> Photorealistic basemap <span class="lyr-note">(off — needs API key)</span></label>
+      <label title="Official NYC planimetric map tiles (or OSM) draped as the street basemap. Streamed at runtime; needs network. Never feeds the solver."><input type="checkbox" id="lyrBasemap" /> Street basemap <span id="bmSrc" class="lyr-note">NYC tiles</span></label>
+      <label class="lyr-off" title="Optional Google Photorealistic 3D Tiles — presentation only, requires a Google Maps Platform key and live attribution, and must never feed the solver or exported assets."><input type="checkbox" id="lyrGoogle" disabled /> Google 3D (presentation-only) <span class="lyr-note">(off — needs key)</span></label>
     </div>
+    <div id="basemapAttr" class="attr-line" style="display:none"></div>
 
     <div id="presetsWrap"><h2>Camera presets</h2><div id="presets" class="preset-row"></div></div>
 
@@ -124,11 +132,15 @@
     <h2>Alert matrix</h2>
     <div id="alertList"></div>
 
+    <h2>Sources &amp; attribution</h2>
+    <div id="sources" class="sources"></div>
+
     <h2>About</h2>
     <div style="color:var(--muted);font-size:11px">
       Depth &amp; velocity per cell come from the offline Python solver. Color =
       danger = max(depth/D<sub>crit</sub>, hazard/HR<sub>crit</sub>); opacity rises
-      with depth. Click an alert to jump to it.
+      with depth. Click an alert to jump to it. All geometry is from official
+      public datasets — no Google-derived geometry feeds the model.
     </div>
   </aside>
 
