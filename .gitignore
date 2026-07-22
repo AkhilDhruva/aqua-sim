@@ -27,3 +27,4 @@ output/
 *.log
 viz/ida_run/
 viz/nyc_run/
+viz/lm_run/

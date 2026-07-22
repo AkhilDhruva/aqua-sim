@@ -54,6 +54,33 @@ Practical notes:
 - **Licensing:** USGS 3DEP and NYC OpenData are open / public-domain — fine to use
   and redistribute results. Provenance is captured in every run's manifest.
 
+## 2a. Building footprints (official NYC dataset)
+
+Building-aware runs use the **official NYC Open Data "Building Footprints"
+dataset (ID `nqwf-w8eh`)** — footprint polygons with `HEIGHTROOF` (roof height
+above ground) and `GROUNDELEV` (NAVD88 ground elevation), both in **feet**,
+native CRS EPSG:2263 (NY State Plane Long Island, US survey ft). License: NYC
+Open Data free public use.
+
+**Transport note (egress-restricted sandboxes):** every official host
+(`data.cityofnewyork.us`, nyc.gov, ArcGIS Hub, NY State GIS) is blocked from
+this environment; the dataset content was retrieved from a public GitHub
+mirror of an official extract (Manhattan clip, 44,895 features, GeoPackage)
+and pinned by SHA-256 in every run's provenance
+(`manifest.provenance.terrain_meta.buildings.source_sha256`). To refresh from
+the source of record when egress allows:
+
+```bash
+curl -L -o buildings.geojson \
+  "https://data.cityofnewyork.us/api/geospatial/nqwf-w8eh?method=export&format=GeoJSON"
+```
+
+Integration policy (see `ingestion/buildings.py`): grids at ≤10 m get closed
+no-flow obstacle cells where footprint coverage ≥ 0.5; coarser (screening
+resolution) grids export the coverage fraction and keep buildings
+presentation-only — binary blocking at 30 m misrepresents the street network.
+**No Google Earth / Street View / 3D-Tiles geometry is used anywhere.**
+
 ## 3. Validation data (to move from "plausible" to "defensible")
 
 Analytic benchmarks are in the code today (mass conservation, lake-at-rest — see

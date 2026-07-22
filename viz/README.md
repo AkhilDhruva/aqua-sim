@@ -43,6 +43,25 @@ python -m http.server 8000
 - **Provenance strip** — `run_id`, terrain source, grid, CRS, storm and scheme
   from the manifest, always visible in the header.
 
+## Buildings layer
+
+Runs that ship a `buildings.json` (see
+`ingestion/buildings.export_buildings_json`) get a **3D buildings layer**:
+official-dataset footprints extruded to true height, spatially tiled, one
+batched draw per tile with **two LOD levels** (true polygons near, box prisms
+far) and per-tile frustum culling. Coordinates arrive **scene-local** — the
+grid's UTM origin is subtracted server-side, so float32 never sees full
+eastings. **Click a building** for height, ground elevation, peak adjacent
+flood depth, first critical-depth crossing time, and max hazard class
+(computed client-side from the loaded frames + the manifest's hazard block).
+Layer checkboxes toggle Terrain / Buildings / Water / Sensors.
+
+Geometry policy: buildings come only from official public datasets (NYC Open
+Data Building Footprints; provenance + SHA-256 in `buildings.json`). The
+"Photorealistic basemap" toggle is a disabled placeholder: streaming Google
+3D Tiles would require an API key and live attribution and may never feed the
+solver or exported assets — no Google-derived geometry exists in this repo.
+
 ## Vendored dependencies
 
 `vendor/` contains Three.js (`three.module.min.js`, MIT — see `THREE_LICENSE`)

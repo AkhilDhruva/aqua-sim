@@ -112,13 +112,15 @@ def write_run(
     # Static terrain (loaded once by the viewer). The mask matters: DEM ingestion
     # void-fills nodata cells, and only the mask tells the viewer they are not
     # real terrain.
+    terrain_doc = {"nx": grid.nx, "ny": grid.ny, "dx": grid.dx,
+                   "z": _round_grid(grid.z, 3), "obstacle": _round_grid(grid.obstacle, 2),
+                   "mask": [[bool(v) for v in row] for row in grid.mask]}
+    if grid.coverage is not None:
+        # Building coverage fraction (screening-resolution runs export this
+        # instead of binary obstacles; see ingestion.buildings.apply_buildings).
+        terrain_doc["coverage"] = _round_grid(grid.coverage, 3)
     with open(os.path.join(run_dir, "terrain.json"), "w") as f:
-        json.dump(
-            {"nx": grid.nx, "ny": grid.ny, "dx": grid.dx,
-             "z": _round_grid(grid.z, 3), "obstacle": _round_grid(grid.obstacle, 2),
-             "mask": [[bool(v) for v in row] for row in grid.mask]},
-            f,
-        )
+        json.dump(terrain_doc, f)
 
     # Provenance is computed up front so every frame can carry the run id.
     provenance = {

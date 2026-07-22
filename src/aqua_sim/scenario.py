@@ -171,7 +171,7 @@ def build_nyc_metro_scenario(
         storm=storm,
         solver=SolverConfig(cfl=0.7, total_time_s=total_s,
                             output_interval_s=total_s / output_frames),
-        aoi_name="New York City metro (five boroughs)",
+        aoi_name=f"New York City metro (five boroughs) — screening resolution {target_dx_m:.0f} m",
     )
     return Scenario(grid=grid, config=config, nodes=nodes)
 

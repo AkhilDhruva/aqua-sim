@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { PALETTES, DEFAULT_PALETTE, THRESHOLDS, paletteUniforms } from './palettes.js';
+import { BuildingsLayer, buildingFloodStats } from './buildings-layer.js';
 
 const state = {
   manifest: null,
@@ -27,6 +28,8 @@ const state = {
   hazard: null,         // engine hazard thresholds from manifest.json
   nodes: [],            // sink-node positions from manifest.json
   nodeMarkers: [],      // {node, mesh} pairs in the scene
+  buildings: null,      // BuildingsLayer instance (created with the scene)
+  buildingsDoc: null,   // parsed buildings.json, when the run provides one
 };
 
 // Engine hazard thresholds for the shader/legend: prefer the values the run's
@@ -65,6 +68,8 @@ async function loadRun() {
     const terrain = await fetchJSON(base + 'terrain.json');
     let alerts = [];
     try { alerts = await fetchJSON(base + (manifest.alerts_file || 'alerts.json')); } catch (e) {}
+    let buildingsDoc = null;   // optional layer — separate contract from terrain.json
+    try { buildingsDoc = await fetchJSON(base + 'buildings.json'); } catch (e) {}
 
     setStatus(`Loading ${manifest.frame_count} frames …`);
     const frames = await Promise.all(
@@ -77,10 +82,13 @@ async function loadRun() {
     state.alerts = alerts;
     state.nodes = manifest.nodes || [];
     state.hazard = manifest.hazard || null;
+    state.buildingsDoc = buildingsDoc;
     state.nx = terrain.nx; state.ny = terrain.ny; state.dx = terrain.dx;
     state.cur = 0;
 
     buildScene();
+    buildBuildings();
+    buildPresets();
     buildAlertMatrix();
     showProvenance();
     renderLegend();
@@ -337,6 +345,76 @@ function applyPalette(key) {
   renderLegend();
 }
 
+// ---------- buildings layer, presets, picking ----------
+
+function buildBuildings() {
+  if (!state.buildings) state.buildings = new BuildingsLayer(state.scene);
+  state.buildings.clear();
+  document.getElementById('bInfo').style.display = 'none';
+  const chk = document.getElementById('lyrBuildings');
+  if (!state.buildingsDoc) {
+    chk.disabled = true;
+    document.getElementById('bCount').textContent = 'none in this run';
+    return;
+  }
+  chk.disabled = false;
+  const stats = state.buildings.build(state.buildingsDoc, state.vertExag);
+  state.buildings.setVisible(chk.checked);
+  document.getElementById('bCount').textContent =
+    `${stats.buildings} bldgs / ${stats.tiles} tiles`;
+}
+
+function buildPresets() {
+  const holder = document.getElementById('presets');
+  holder.innerHTML = '';
+  const presets = state.buildingsDoc?.presets || [];
+  for (const p of presets) {
+    const btn = document.createElement('button');
+    btn.textContent = p.name;
+    btn.onclick = () => {
+      state.controls.target.set(p.x, 0, p.z);
+      state.camera.position.set(p.x + p.dist * 0.35, p.dist * 0.55, p.z + p.dist * 0.8);
+    };
+    holder.appendChild(btn);
+  }
+  holder.parentElement.style.display = presets.length ? '' : 'none';
+}
+
+function showBuildingInfo(b) {
+  const panel = document.getElementById('bInfo');
+  if (!b) { panel.style.display = 'none'; return; }
+  const gridDims = { nx: state.nx, ny: state.ny };
+  const s = buildingFloodStats(b, state.frames, gridDims, state.hazard);
+  const cross = s.firstCrossing_s !== null
+    ? `${(s.firstCrossing_s / 60).toFixed(0)} min` : 'never';
+  panel.style.display = '';
+  panel.innerHTML =
+    `<b>Building ${b.bin || b.id}</b>${b.year ? ` · built ${b.year}` : ''}<br>` +
+    `height <b>${b.h.toFixed(1)} m</b> · ground elev ${b.base.toFixed(1)} m<br>` +
+    `peak adjacent depth <b>${s.peakAdjacentDepth.toFixed(2)} m</b><br>` +
+    `first ≥critical crossing: <b>${cross}</b><br>` +
+    `max hazard: <b class="hz-${s.maxHazardClass.toLowerCase()}">${s.maxHazardClass}</b>`;
+}
+
+const _ray = new THREE.Raycaster();
+const _ptr = new THREE.Vector2();
+let _downAt = null;
+
+function initPicking(canvas) {
+  canvas.addEventListener('pointerdown', (ev) => { _downAt = [ev.clientX, ev.clientY]; });
+  canvas.addEventListener('pointerup', (ev) => {
+    if (!_downAt) return;
+    const moved = Math.hypot(ev.clientX - _downAt[0], ev.clientY - _downAt[1]);
+    _downAt = null;
+    if (moved > 5 || !state.buildings) return;   // it was a drag, not a click
+    const r = canvas.getBoundingClientRect();
+    _ptr.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    _ptr.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    _ray.setFromCamera(_ptr, state.camera);
+    showBuildingInfo(state.buildings.pick(_ray));
+  });
+}
+
 // ---------- frame stepping ----------
 
 function setFrame(i) {
@@ -470,6 +548,7 @@ function tick(ts) {
     }
   }
   if (state.controls) state.controls.update();
+  if (state.buildings && state.camera) state.buildings.update(state.camera);
   if (state.renderer) state.renderer.render(state.scene, state.camera);
 }
 
@@ -506,6 +585,20 @@ function initUI() {
   };
   document.getElementById('speedSel').onchange = (e) => { state.fps = Number(e.target.value); };
   document.getElementById('loadBtn').onclick = loadRun;
+
+  // Layer toggles. Basemap stays a disabled placeholder: streaming
+  // Photorealistic 3D Tiles needs an API key and live attribution, and it may
+  // never feed the solver or exports — see viz/README.md.
+  const layers = {
+    lyrTerrain: (v) => { const m = state.scene?.getObjectByName('terrainMesh'); if (m) m.visible = v; },
+    lyrBuildings: (v) => state.buildings?.setVisible(v),
+    lyrWater: (v) => { const m = state.scene?.getObjectByName('waterMesh'); if (m) m.visible = v; },
+    lyrSensors: (v) => { for (const mk of state.nodeMarkers) mk.group.visible = v; },
+  };
+  for (const [id, fn] of Object.entries(layers)) {
+    document.getElementById(id).onchange = (e) => fn(e.target.checked);
+  }
+  initPicking(document.getElementById('gl'));
 
   renderLegend();
   requestAnimationFrame(tick);
