@@ -16,56 +16,66 @@ import * as THREE from 'three';
 const LOD_SWITCH_M = 1800;         // camera distance where LOD0 -> LOD1
 
 function mergeNonIndexed(geoms) {
+  // Position-only merge — the flatShading materials derive face normals in the
+  // shader, so a per-vertex normal buffer would be dead weight (~2x memory).
   let vtx = 0;
   for (const g of geoms) vtx += g.attributes.position.count;
   const pos = new Float32Array(vtx * 3);
-  const nor = new Float32Array(vtx * 3);
   let o = 0;
   const ranges = [];
   for (const g of geoms) {
-    const p = g.attributes.position.array;
-    const n = g.attributes.normal.array;
-    pos.set(p, o * 3);
-    nor.set(n, o * 3);
+    pos.set(g.attributes.position.array, o * 3);
     ranges.push([o, o + g.attributes.position.count]);
     o += g.attributes.position.count;
     g.dispose();
   }
   const merged = new THREE.BufferGeometry();
   merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  merged.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   merged.computeBoundingSphere();
   return { merged, ranges };
 }
 
-function extrudeBuilding(b, W, H, exag) {
-  // Shape in (x, -z) so rotateX(-90deg) yields y-up, z-south.
-  const outer = b.rings[0];
+function shapeFromPolygon(poly, W, H) {
+  // ring[0] outer, rest holes; (x, -z) so rotateX(-90deg) yields y-up, z-south.
   const shape = new THREE.Shape();
-  outer.forEach(([lx, ly], i) => {
+  poly[0].forEach(([lx, ly], i) => {
     const sx = lx - W / 2, sy = -(ly - H / 2);
     if (i === 0) shape.moveTo(sx, sy); else shape.lineTo(sx, sy);
   });
-  for (let r = 1; r < b.rings.length; r++) {
+  for (let r = 1; r < poly.length; r++) {
     const hole = new THREE.Path();
-    b.rings[r].forEach(([lx, ly], i) => {
+    poly[r].forEach(([lx, ly], i) => {
       const sx = lx - W / 2, sy = -(ly - H / 2);
       if (i === 0) hole.moveTo(sx, sy); else hole.lineTo(sx, sy);
     });
     shape.holes.push(hole);
   }
-  const g = new THREE.ExtrudeGeometry(shape, { depth: b.h * exag, bevelEnabled: false });
-  g.rotateX(-Math.PI / 2);
-  g.translate(0, b.base * exag, 0);
-  const ng = g.index ? g.toNonIndexed() : g;
-  if (ng !== g) g.dispose();
-  return ng;
+  return shape;
+}
+
+function extrudeBuilding(b, W, H, exag) {
+  // One extruded geometry per polygon part, merged into one building geometry.
+  const parts = [];
+  for (const poly of b.polys) {
+    const g = new THREE.ExtrudeGeometry(shapeFromPolygon(poly, W, H),
+      { depth: b.h * exag, bevelEnabled: false });
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, b.base * exag, 0);
+    const ng = g.index ? g.toNonIndexed() : g;
+    if (ng !== g) g.dispose();
+    parts.push(ng);
+  }
+  if (parts.length === 1) return parts[0];
+  return mergeNonIndexed(parts).merged;
 }
 
 function boxPrism(b, W, H, exag) {
-  const xs = b.rings[0].map((p) => p[0]), ys = b.rings[0].map((p) => p[1]);
-  const x0 = Math.min(...xs) - W / 2, x1 = Math.max(...xs) - W / 2;
-  const z0 = Math.min(...ys) - H / 2, z1 = Math.max(...ys) - H / 2;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const poly of b.polys) for (const [x, y] of poly[0]) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < z0) z0 = y; if (y > z1) z1 = y;
+  }
+  x0 -= W / 2; x1 -= W / 2; z0 -= H / 2; z1 -= H / 2;
   const g = new THREE.BoxGeometry(Math.max(x1 - x0, 1), b.h * exag, Math.max(z1 - z0, 1));
   g.translate((x0 + x1) / 2, b.base * exag + (b.h * exag) / 2, (z0 + z1) / 2);
   const ng = g.index ? g.toNonIndexed() : g;
@@ -148,6 +158,8 @@ export class BuildingsLayer {
 // Flood statistics for one building, computed from the loaded frames.
 // Uses the cells of the building's footprint bbox expanded by one ring
 // (obstacle cells themselves are dry by construction at fine resolution).
+const KINETIC_FLOOR_M = 0.08;   // must match the shader's uKineticFloor
+
 export function buildingFloodStats(b, frames, grid, hazard) {
   const [bi0, bj0, bi1, bj1] = b.cells;
   const i0 = Math.max(bi0 - 1, 0), j0 = Math.max(bj0 - 1, 0);
@@ -163,7 +175,9 @@ export function buildingFloodStats(b, frames, grid, hazard) {
         const d = fr.depth[j][i];
         if (d > frameMax) frameMax = d;
         if (d > 0) {
-          const s = fr.speed?.[j]?.[i] ?? 0;
+          // Velocity term gated below the kinetic floor, exactly as the water
+          // shader does, so the panel's hazard can't exceed what's on screen.
+          const s = d >= KINETIC_FLOOR_M ? (fr.speed?.[j]?.[i] ?? 0) : 0;
           const hr = d * (Math.max(s, 0) + df);
           if (hr > maxHR) maxHR = hr;
         }

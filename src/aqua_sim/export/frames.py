@@ -59,13 +59,18 @@ def _representative_manning(grid: Grid) -> float:
 
 
 def _terrain_digest(grid: Grid) -> str:
-    """SHA-256 over the elevation and obstacle content (mm precision).
+    """SHA-256 over the elevation, obstacle, and building-coverage content.
 
     Two different terrains at the same file path get different digests — so the
     run id genuinely covers *what* was simulated, not just where it came from.
+    Coverage is included so screening-resolution building runs (which add no
+    obstacle cells) still produce distinct run ids when the buildings differ.
     """
     hasher = hashlib.sha256()
-    for matrix in (grid.z, grid.obstacle):
+    matrices = [grid.z, grid.obstacle]
+    if grid.coverage is not None:
+        matrices.append(grid.coverage)
+    for matrix in matrices:
         for row in matrix:
             hasher.update(",".join(f"{v:.3f}" for v in row).encode())
             hasher.update(b";")

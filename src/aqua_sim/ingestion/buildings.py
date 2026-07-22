@@ -59,16 +59,31 @@ NYC_FOOTPRINTS_DATASET = {
 }
 
 
+#: One ring = list of (x, y). One polygon = [outer_ring, *hole_rings].
+Ring = list  # list[tuple[float, float]]
+Polygon = list  # list[Ring]
+
+
 @dataclass
 class Building:
-    """One footprint in grid-CRS meters, physics- and viz-ready."""
+    """One footprint in grid-CRS meters, physics- and viz-ready.
+
+    ``polygons`` preserves MultiPolygon structure: a footprint with separate
+    parts keeps each part's outer ring distinct (flattening them into one ring
+    list would make a second part's outer ring read as a hole of the first).
+    """
 
     id: str
     height_m: float
     ground_m: Optional[float]          # NAVD88 ground elevation (m), if present
-    rings: list[list[tuple[float, float]]]  # outer ring + holes, grid-CRS meters
+    polygons: list[Polygon]            # [[outer, *holes], ...], grid-CRS meters
     year: Optional[int] = None
     bin: Optional[str] = None
+
+    def all_points(self) -> Iterable[tuple[float, float]]:
+        for poly in self.polygons:
+            for ring in poly:
+                yield from ring
 
 
 @dataclass
@@ -165,7 +180,11 @@ class BuildingsSource:
         buildings: list[Building] = []
         total = 0
         with fiona.open(self.path) as src:
-            src_crs = src.crs_wkt or (f"EPSG:{src.crs.to_epsg()}" if src.crs else None)
+            if not src.crs:
+                raise ValueError(f"Building source {self.path!r} has no CRS; "
+                                 "cannot reproject into the grid CRS.")
+            epsg = src.crs.to_epsg()
+            src_crs = f"EPSG:{epsg}" if epsg else src.crs_wkt
             total = len(src)
             # bbox filter in the SOURCE CRS: clip before any processing.
             src_bbox = transform_bounds("EPSG:4326", src_crs, *aoi_bounds,
@@ -189,18 +208,19 @@ class BuildingsSource:
                 except (TypeError, ValueError):
                     ground_m = None
                 projected = transform_geom(src_crs, grid.crs, geom)
-                rings: list[list[tuple[float, float]]] = []
-                for poly in _geom_rings(projected):
-                    for ring in poly:
-                        rings.append([(float(x), float(y)) for x, y in ring])
-                if not rings:
+                polygons: list[Polygon] = []
+                for poly in _geom_rings(projected):  # one entry per polygon part
+                    rings = [[(float(x), float(y)) for x, y in ring] for ring in poly]
+                    if rings:
+                        polygons.append(rings)
+                if not polygons:
                     continue
                 year = _first_key(props, "CNSTRCT_YR")
                 buildings.append(Building(
                     id=str(_first_key(props, "DOITT_ID", "fid") or len(buildings)),
                     height_m=height_m,
                     ground_m=ground_m,
-                    rings=rings,
+                    polygons=polygons,
                     year=int(year) if year else None,
                     bin=str(_first_key(props, "BIN") or "") or None,
                 ))
@@ -209,9 +229,8 @@ class BuildingsSource:
             **self.dataset_info,
             "transport_url": self.transport_url,
             "source_file": os.path.basename(self.path),
-            "source_sha256": _sha256(self.path),
-            "source_mtime_utc": __import__("datetime").datetime.utcfromtimestamp(
-                os.path.getmtime(self.path)).isoformat() + "Z",
+            "source_sha256": _sha256(self.path),  # content id (mtime deliberately
+            # excluded: it would make the hashed run_id vary per download)
             "grid_crs": grid.crs,
             "aoi_bounds_wgs84": list(aoi_bounds),
             "features_in_source": total,
@@ -243,8 +262,9 @@ def rasterize_coverage(collection: BuildingCollection, grid: Grid,
     shape = (grid.ny * supersample, grid.nx * supersample)
     shapes = []
     for bld in collection.buildings:
-        coords = [[list(pt) for pt in ring] for ring in bld.rings]
-        shapes.append(({"type": "Polygon", "coordinates": coords}, 1))
+        for poly in bld.polygons:  # one shape per polygon part (holes preserved)
+            coords = [[list(pt) for pt in ring] for ring in poly]
+            shapes.append(({"type": "Polygon", "coordinates": coords}, 1))
     if not shapes:
         return np.zeros((grid.ny, grid.nx))
     mask = rfeatures.rasterize(shapes, out_shape=shape, transform=fine,
@@ -280,13 +300,16 @@ def apply_buildings(grid: Grid, collection: BuildingCollection,
         # Height raster: max building height per cell (for wall height).
         from rasterio import features as rfeatures
         from rasterio.transform import Affine
-        hshapes = [({"type": "Polygon",
-                     "coordinates": [[list(pt) for pt in ring] for ring in b.rings]},
-                    b.height_m) for b in collection.buildings]
+        hshapes = []
+        for b in collection.buildings:
+            for poly in b.polygons:
+                hshapes.append(({"type": "Polygon",
+                                 "coordinates": [[list(pt) for pt in ring]
+                                                 for ring in poly]}, b.height_m))
+        hshapes.sort(key=lambda s: s[1])  # ascending: tallest drawn last == max
         heights = rfeatures.rasterize(
             hshapes, out_shape=(grid.ny, grid.nx),
-            transform=Affine(*grid.transform), dtype="float64", all_touched=False,
-            merge_alg=__import__("rasterio.enums", fromlist=["MergeAlg"]).MergeAlg.replace)
+            transform=Affine(*grid.transform), dtype="float64", all_touched=True)
         solid = coverage >= closed_threshold
         for y in range(grid.ny):
             row_solid = solid[y]
@@ -302,7 +325,7 @@ def apply_buildings(grid: Grid, collection: BuildingCollection,
         "closed_cells": closed,
         "closed_threshold": closed_threshold if fine else None,
         "buildings": len(collection),
-        "mean_coverage": float(np.mean(coverage)) if coverage.size else 0.0,
+        "mean_coverage": round(float(np.mean(coverage)), 6) if coverage.size else 0.0,
     }
     grid.meta["buildings"] = {**collection.provenance, "integration": summary}
     return summary
@@ -331,10 +354,20 @@ def export_buildings_json(collection: BuildingCollection, grid: Grid,
     a, _, left, _, e, top = grid.transform
     dx = grid.dx
 
-    def dem_base(cx_m: float, cy_m: float) -> float:
-        i = min(max(int(cx_m / dx), 0), grid.nx - 1)
-        j = min(max(int(cy_m / dx), 0), grid.ny - 1)
-        return grid.z[j][i]
+    def dem_base_over(i0, j0, i1, j1) -> float:
+        # Seat the flat-bottomed prism on the LOWEST in-mask ground cell under
+        # the footprint, so a building on a slope doesn't hover or clip; ignore
+        # void-fill (masked) cells so a footprint over nodata isn't dropped to
+        # the artificial minimum elevation.
+        best = None
+        for j in range(j0, j1 + 1):
+            for i in range(i0, i1 + 1):
+                if grid.mask[j][i]:
+                    z = grid.z[j][i]
+                    if best is None or z < best:
+                        best = z
+        return best if best is not None else grid.z[min(max((j0 + j1) // 2, 0), grid.ny - 1)][
+            min(max((i0 + i1) // 2, 0), grid.nx - 1)]
 
     tiles: dict[tuple[int, int], dict] = {}
     exported = 0
@@ -342,9 +375,8 @@ def export_buildings_json(collection: BuildingCollection, grid: Grid,
         if b.height_m < min_height_m:
             continue
         exported += 1
-        outer = b.rings[0]
-        lx = [p[0] - left for p in outer]
-        ly = [top - p[1] for p in outer]
+        pts = [(p[0] - left, top - p[1]) for p in b.all_points()]
+        lx = [p[0] for p in pts]; ly = [p[1] for p in pts]
         cx, cy = sum(lx) / len(lx), sum(ly) / len(ly)
         key = (int(cx // tile_m), int(cy // tile_m))
         t = tiles.setdefault(key, {"key": list(key), "buildings": []})
@@ -353,11 +385,12 @@ def export_buildings_json(collection: BuildingCollection, grid: Grid,
         t["buildings"].append({
             "id": b.id, "bin": b.bin, "h": round(b.height_m, 2),
             "ground": round(b.ground_m, 2) if b.ground_m is not None else None,
-            "base": round(dem_base(cx, cy), 2),
+            "base": round(dem_base_over(i0, j0, i1, j1), 2),
             "year": b.year,
             "cells": [i0, j0, i1, j1],
-            "rings": [[[round(p[0] - left, 2), round(top - p[1], 2)]
-                       for p in ring] for ring in b.rings],
+            # One entry per polygon part; ring[0] outer, rest holes.
+            "polys": [[[[round(p[0] - left, 2), round(top - p[1], 2)] for p in ring]
+                       for ring in poly] for poly in b.polygons],
         })
 
     doc = {

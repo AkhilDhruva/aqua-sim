@@ -88,6 +88,7 @@ async function loadRun() {
 
     buildScene();
     buildBuildings();
+    applyLayerState();   // reflect checkbox state onto freshly-created objects
     buildPresets();
     buildAlertMatrix();
     showProvenance();
@@ -122,11 +123,24 @@ function buildScene() {
     state.scene.add(sun);
     window.addEventListener('resize', onResize);
   }
-  // Clear any previous terrain/water on reload.
+  // Clear any previous terrain/water on reload — dispose GPU resources
+  // (geometry AND material/textures) so repeated "Load run" doesn't leak.
   for (const name of ['terrainMesh', 'waterMesh']) {
     const old = state.scene.getObjectByName(name);
-    if (old) { state.scene.remove(old); old.geometry.dispose(); }
+    if (old) {
+      state.scene.remove(old);
+      old.geometry.dispose();
+      if (old.material) old.material.dispose();
+    }
   }
+  for (const m of state.nodeMarkers) {
+    state.scene.remove(m.group);
+    m.group.traverse((o) => {
+      o.geometry?.dispose();
+      if (o.material) { o.material.map?.dispose(); o.material.dispose(); }
+    });
+  }
+  state.nodeMarkers = [];
 
   const W = (nx - 1) * dx, H = (ny - 1) * dx;
 
@@ -183,8 +197,6 @@ function buildScene() {
   state.scene.add(wMesh);
 
   // ----- sink-node markers (subway stations etc.) -----
-  for (const m of state.nodeMarkers) state.scene.remove(m.group);
-  state.nodeMarkers = [];
   const cxg = (nx - 1) / 2, cyg = (ny - 1) / 2;
   const pinH = Math.max(W, H) * 0.03;
   const pinR = Math.max(W, H) * 0.004;
@@ -345,6 +357,25 @@ function applyPalette(key) {
   renderLegend();
 }
 
+// ---------- layers ----------
+
+// Layer visibility setters. Basemap is a disabled placeholder: streaming
+// Photorealistic 3D Tiles needs an API key and live attribution and may never
+// feed the solver or exports — see viz/README.md.
+const LAYER_FNS = {
+  lyrTerrain: (v) => { const m = state.scene?.getObjectByName('terrainMesh'); if (m) m.visible = v; },
+  lyrBuildings: (v) => state.buildings?.setVisible(v),
+  lyrWater: (v) => { const m = state.scene?.getObjectByName('waterMesh'); if (m) m.visible = v; },
+  lyrSensors: (v) => { for (const mk of state.nodeMarkers) mk.group.visible = v; },
+};
+
+function applyLayerState() {
+  for (const id of Object.keys(LAYER_FNS)) {
+    const box = document.getElementById(id);
+    if (box && !box.disabled) LAYER_FNS[id](box.checked);
+  }
+}
+
 // ---------- buildings layer, presets, picking ----------
 
 function buildBuildings() {
@@ -387,10 +418,15 @@ function showBuildingInfo(b) {
   const s = buildingFloodStats(b, state.frames, gridDims, state.hazard);
   const cross = s.firstCrossing_s !== null
     ? `${(s.firstCrossing_s / 60).toFixed(0)} min` : 'never';
+  // Ground elevation is the official dataset value (NAVD88) when present; the
+  // DEM base (what the prism sits on) is shown separately when it differs.
+  const groundStr = b.ground != null
+    ? `${b.ground.toFixed(1)} m <span class="lyr-note">NAVD88</span>`
+    : `${b.base.toFixed(1)} m <span class="lyr-note">DEM</span>`;
   panel.style.display = '';
   panel.innerHTML =
     `<b>Building ${b.bin || b.id}</b>${b.year ? ` · built ${b.year}` : ''}<br>` +
-    `height <b>${b.h.toFixed(1)} m</b> · ground elev ${b.base.toFixed(1)} m<br>` +
+    `height <b>${b.h.toFixed(1)} m</b> · ground elev ${groundStr}<br>` +
     `peak adjacent depth <b>${s.peakAdjacentDepth.toFixed(2)} m</b><br>` +
     `first ≥critical crossing: <b>${cross}</b><br>` +
     `max hazard: <b class="hz-${s.maxHazardClass.toLowerCase()}">${s.maxHazardClass}</b>`;
@@ -586,17 +622,8 @@ function initUI() {
   document.getElementById('speedSel').onchange = (e) => { state.fps = Number(e.target.value); };
   document.getElementById('loadBtn').onclick = loadRun;
 
-  // Layer toggles. Basemap stays a disabled placeholder: streaming
-  // Photorealistic 3D Tiles needs an API key and live attribution, and it may
-  // never feed the solver or exports — see viz/README.md.
-  const layers = {
-    lyrTerrain: (v) => { const m = state.scene?.getObjectByName('terrainMesh'); if (m) m.visible = v; },
-    lyrBuildings: (v) => state.buildings?.setVisible(v),
-    lyrWater: (v) => { const m = state.scene?.getObjectByName('waterMesh'); if (m) m.visible = v; },
-    lyrSensors: (v) => { for (const mk of state.nodeMarkers) mk.group.visible = v; },
-  };
-  for (const [id, fn] of Object.entries(layers)) {
-    document.getElementById(id).onchange = (e) => fn(e.target.checked);
+  for (const id of Object.keys(LAYER_FNS)) {
+    document.getElementById(id).onchange = (e) => LAYER_FNS[id](e.target.checked);
   }
   initPicking(document.getElementById('gl'));
 

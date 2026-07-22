@@ -82,7 +82,7 @@ def test_feet_to_meters_and_schema(tmp_path, flat_grid):
     assert b.bin == "1000001" and b.year == 1931
     # Geometry landed in the grid CRS (meters): ring coords within grid extent.
     a, _, left, _, e, top = flat_grid.transform
-    xs = [p[0] for p in b.rings[0]]
+    xs = [p[0] for p in b.polygons[0][0]]
     assert left <= min(xs) and max(xs) <= left + flat_grid.nx * a
 
 
@@ -186,6 +186,34 @@ def test_dam_break_is_blocked_and_routed_by_footprint(tmp_path, flat_grid):
     assert abs(v1 - v0) / v0 < 1e-9             # and mass stayed conserved
 
 
+def test_multipolygon_parts_stay_separate(tmp_path, flat_grid):
+    # A MultiPolygon with two disjoint parts must NOT fold part 2's outer ring
+    # into part 1 as a hole — both parts should be solid coverage.
+    r1 = _rect_in_grid(flat_grid, 10, 10, 14, 14)
+    r2 = _rect_in_grid(flat_grid, 30, 30, 34, 34)
+    from rasterio.warp import transform as warp_transform
+
+    def ring(rect):
+        x0, y0, x1, y1 = rect
+        xs, ys = warp_transform(flat_grid.crs, "EPSG:2263", [x0, x1], [y0, y1])
+        return [(xs[0], ys[0]), (xs[1], ys[0]), (xs[1], ys[1]), (xs[0], ys[1]), (xs[0], ys[0])]
+
+    schema = {"geometry": "MultiPolygon",
+              "properties": {"HEIGHTROOF": "float", "DOITT_ID": "str"}}
+    path = str(tmp_path / "mp.gpkg")
+    with fiona.open(path, "w", driver="GPKG", crs="EPSG:2263", schema=schema,
+                    layer="buildings") as dst:
+        dst.write({"geometry": {"type": "MultiPolygon",
+                                "coordinates": [[ring(r1)], [ring(r2)]]},
+                   "properties": {"HEIGHTROOF": 100.0, "DOITT_ID": "7"}})
+    coll = BuildingsSource(path).load_for_grid(flat_grid)
+    assert len(coll) == 1
+    assert len(coll.buildings[0].polygons) == 2      # two parts preserved
+    cov = rasterize_coverage(coll, flat_grid)
+    assert cov[12][12] > 0.9 and cov[32][32] > 0.9   # BOTH parts covered
+    assert cov[22][22] == 0.0                        # gap between them is open
+
+
 def test_buildings_json_export(tmp_path, flat_grid):
     rect = _rect_in_grid(flat_grid, 10, 10, 20, 20)
     gpkg = _write_official_style_gpkg(str(tmp_path / "b.gpkg"), flat_grid, rect)
@@ -198,7 +226,8 @@ def test_buildings_json_export(tmp_path, flat_grid):
     i0, j0, i1, j1 = b["cells"]
     assert 0 <= i0 <= i1 < flat_grid.nx and 0 <= j0 <= j1 < flat_grid.ny
     # Scene-local coords: within [0, W]x[0, H]
-    xs = [p[0] for p in b["rings"][0]]; ys = [p[1] for p in b["rings"][0]]
+    outer = b["polys"][0][0]
+    xs = [p[0] for p in outer]; ys = [p[1] for p in outer]
     assert 0 <= min(xs) and max(xs) <= flat_grid.nx * flat_grid.dx
     assert 0 <= min(ys) and max(ys) <= flat_grid.ny * flat_grid.dx
     saved = json.load(open(tmp_path / "run" / "buildings.json"))
