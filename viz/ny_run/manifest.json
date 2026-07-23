@@ -1,0 +1,314 @@
+{
+  "format_version": "2.0",
+  "run_id": "ae7aa0bdd9784b5e",
+  "aoi": "New York area \u2014 Staten Island to Long Island (screening 250 m)",
+  "grid": {
+    "nx": 776,
+    "ny": 243,
+    "dx_m": 250.0,
+    "crs": "EPSG:32618"
+  },
+  "units": {
+    "elevation": "m",
+    "depth": "m",
+    "velocity": "m/s",
+    "time": "s"
+  },
+  "time_axis_s": [
+    0.0,
+    900.0,
+    1800.0,
+    2700.0,
+    3600.0,
+    4500.0,
+    5400.0,
+    6300.0,
+    7200.0,
+    8100.0,
+    9000.0,
+    9900.0,
+    10800.0,
+    11700.0,
+    12600.0,
+    13500.0,
+    14400.0,
+    15300.0,
+    16200.0,
+    17100.0,
+    18000.0,
+    18900.0,
+    19800.0,
+    20700.0,
+    21600.0
+  ],
+  "frame_count": 25,
+  "peak_depth_m": 4.6457,
+  "hazard": {
+    "debris_factor": 0.5,
+    "hr_bands": {
+      "low": 0.75,
+      "moderate": 1.25,
+      "significant": 2.0
+    },
+    "depth_critical_m": 0.5
+  },
+  "provenance": {
+    "terrain_source": "DEMSource",
+    "terrain_digest": "b85ef6d693298b80",
+    "resolution_m": 250.0,
+    "crs": "EPSG:32618",
+    "solver_scheme": "local_inertial",
+    "manning_representative": 0.03,
+    "storm": {
+      "rainfall_mm_per_hr": 80.0,
+      "duration_hours": 4.0,
+      "drainage_capacity_mm_per_hr": 44.0,
+      "drainage_blockage": 0.5
+    },
+    "solver": {
+      "cfl": 0.7,
+      "total_time_s": 21600.0,
+      "output_interval_s": 900.0,
+      "backend": "NumpyShallowWaterSolver"
+    },
+    "terrain_meta": {
+      "source": "DEMSource",
+      "source_path": [
+        "/tmp/claude-0/-home-user-aqua-sim/3501f8ed-2621-5156-b327-4da2a46d8730/scratchpad/USGS_13_n41w074.tif",
+        "/tmp/claude-0/-home-user-aqua-sim/3501f8ed-2621-5156-b327-4da2a46d8730/scratchpad/USGS_13_n41w075.tif",
+        "/tmp/claude-0/-home-user-aqua-sim/3501f8ed-2621-5156-b327-4da2a46d8730/scratchpad/USGS_13_n41w073.tif"
+      ],
+      "resolution_m": 250.0,
+      "target_crs": "EPSG:32618",
+      "wgs84_bounds": [
+        -75.00055555639312,
+        39.99944444400677,
+        -71.99944444516571,
+        41.000555556194854
+      ],
+      "aoi_bounds": [
+        -74.28,
+        40.49,
+        -72.0,
+        41.2
+      ],
+      "note": "reprojected to metric UTM; bare-earth DEM used as flow surface"
+    }
+  },
+  "nodes": [
+    {
+      "name": "Low Point 1",
+      "x": 83,
+      "y": 147,
+      "threshold_elevation": -1.42
+    },
+    {
+      "name": "Low Point 2",
+      "x": 8,
+      "y": 239,
+      "threshold_elevation": -1.42
+    },
+    {
+      "name": "Low Point 3",
+      "x": 170,
+      "y": 68,
+      "threshold_elevation": -1.306
+    },
+    {
+      "name": "Low Point 4",
+      "x": 402,
+      "y": 25,
+      "threshold_elevation": -1.3
+    },
+    {
+      "name": "Low Point 5",
+      "x": 291,
+      "y": 46,
+      "threshold_elevation": -1.3
+    },
+    {
+      "name": "Low Point 6",
+      "x": 657,
+      "y": 46,
+      "threshold_elevation": -1.3
+    }
+  ],
+  "frames": [
+    {
+      "index": 1,
+      "file": "frame_001.json",
+      "time_s": 0.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 2,
+      "file": "frame_002.json",
+      "time_s": 900.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 3,
+      "file": "frame_003.json",
+      "time_s": 1800.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 4,
+      "file": "frame_004.json",
+      "time_s": 2700.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 5,
+      "file": "frame_005.json",
+      "time_s": 3600.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 6,
+      "file": "frame_006.json",
+      "time_s": 4500.0,
+      "max_depth": 0.0635,
+      "breach_count": 0
+    },
+    {
+      "index": 7,
+      "file": "frame_007.json",
+      "time_s": 5400.0,
+      "max_depth": 0.3861,
+      "breach_count": 0
+    },
+    {
+      "index": 8,
+      "file": "frame_008.json",
+      "time_s": 6300.0,
+      "max_depth": 1.0834,
+      "breach_count": 0
+    },
+    {
+      "index": 9,
+      "file": "frame_009.json",
+      "time_s": 7200.0,
+      "max_depth": 1.8401,
+      "breach_count": 0
+    },
+    {
+      "index": 10,
+      "file": "frame_010.json",
+      "time_s": 8100.0,
+      "max_depth": 2.3289,
+      "breach_count": 1
+    },
+    {
+      "index": 11,
+      "file": "frame_011.json",
+      "time_s": 9000.0,
+      "max_depth": 3.1663,
+      "breach_count": 2
+    },
+    {
+      "index": 12,
+      "file": "frame_012.json",
+      "time_s": 9900.0,
+      "max_depth": 3.7162,
+      "breach_count": 3
+    },
+    {
+      "index": 13,
+      "file": "frame_013.json",
+      "time_s": 10800.0,
+      "max_depth": 4.0174,
+      "breach_count": 4
+    },
+    {
+      "index": 14,
+      "file": "frame_014.json",
+      "time_s": 11700.0,
+      "max_depth": 4.2381,
+      "breach_count": 4
+    },
+    {
+      "index": 15,
+      "file": "frame_015.json",
+      "time_s": 12600.0,
+      "max_depth": 4.3731,
+      "breach_count": 4
+    },
+    {
+      "index": 16,
+      "file": "frame_016.json",
+      "time_s": 13500.0,
+      "max_depth": 4.4765,
+      "breach_count": 5
+    },
+    {
+      "index": 17,
+      "file": "frame_017.json",
+      "time_s": 14400.0,
+      "max_depth": 4.5563,
+      "breach_count": 5
+    },
+    {
+      "index": 18,
+      "file": "frame_018.json",
+      "time_s": 15300.0,
+      "max_depth": 4.6051,
+      "breach_count": 5
+    },
+    {
+      "index": 19,
+      "file": "frame_019.json",
+      "time_s": 16200.0,
+      "max_depth": 4.6293,
+      "breach_count": 5
+    },
+    {
+      "index": 20,
+      "file": "frame_020.json",
+      "time_s": 17100.0,
+      "max_depth": 4.6409,
+      "breach_count": 5
+    },
+    {
+      "index": 21,
+      "file": "frame_021.json",
+      "time_s": 18000.0,
+      "max_depth": 4.6455,
+      "breach_count": 5
+    },
+    {
+      "index": 22,
+      "file": "frame_022.json",
+      "time_s": 18900.0,
+      "max_depth": 4.6457,
+      "breach_count": 4
+    },
+    {
+      "index": 23,
+      "file": "frame_023.json",
+      "time_s": 19800.0,
+      "max_depth": 4.6427,
+      "breach_count": 4
+    },
+    {
+      "index": 24,
+      "file": "frame_024.json",
+      "time_s": 20700.0,
+      "max_depth": 4.6379,
+      "breach_count": 4
+    },
+    {
+      "index": 25,
+      "file": "frame_025.json",
+      "time_s": 21600.0,
+      "max_depth": 4.6325,
+      "breach_count": 4
+    }
+  ],
+  "alerts_file": "alerts.json"
+}

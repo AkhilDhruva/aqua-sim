@@ -120,8 +120,10 @@ function buildScene() {
     state.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1e6);
     state.controls = new OrbitControls(state.camera, canvas);
     state.controls.enableDamping = true;
-    state.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    // Intensities calibrated for three.js r155+ physical lighting (the legacy
+    // 0.6/0.9 pair renders up-facing surfaces near-ambient => dark roofs).
+    state.scene.add(new THREE.AmbientLight(0xffffff, 1.7));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.8);
     sun.position.set(1, 2, 1);
     state.scene.add(sun);
     window.addEventListener('resize', onResize);
@@ -151,26 +153,36 @@ function buildScene() {
   const tGeom = gridGeometry(nx, ny, dx);
   const tPos = tGeom.attributes.position;
   const tCol = [];
+  // When the run ships a buildings layer, the terrain stays BARE EARTH —
+  // extruding obstacle cells here would double-draw dark, cell-quantized
+  // building blocks on top of the real extruded footprints (the "dark noisy
+  // roofs" artifact). Without a buildings layer, obstacle extrusion remains
+  // the visual for walls.
+  const extrudeObstacles = !state.buildingsDoc;
   let zmin = Infinity, zmax = -Infinity;
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     if (terrain.mask && terrain.mask[j] && terrain.mask[j][i] === false) continue;
-    const e = terrain.z[j][i] + (terrain.obstacle?.[j]?.[i] || 0);
+    const e = terrain.z[j][i] + (extrudeObstacles ? (terrain.obstacle?.[j]?.[i] || 0) : 0);
     zmin = Math.min(zmin, e); zmax = Math.max(zmax, e);
   }
   // Vertical exaggeration derived from this run's relief: exaggerate flat
   // terrain so ponding reads, leave mountainous terrain near true scale.
+  // Building-aware runs render at TRUE scale (1x) — buildings at true height
+  // demand an unexaggerated ground, or proportions lie.
   const relief = Math.max(zmax - zmin, 1e-6);
-  state.vertExag = Math.min(12, Math.max(1, (0.025 * Math.max(W, H)) / relief));
+  state.vertExag = state.buildingsDoc
+    ? 1.0
+    : Math.min(12, Math.max(1, (0.025 * Math.max(W, H)) / relief));
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i;
     const masked = terrain.mask && terrain.mask[j] && terrain.mask[j][i] === false;
     const base = terrain.z[j][i];
-    const obs = terrain.obstacle?.[j]?.[i] || 0;
+    const obs = extrudeObstacles ? (terrain.obstacle?.[j]?.[i] || 0) : 0;
     const e = base + obs;
     tPos.setY(k, e * state.vertExag);
     let col;
     if (masked) col = new THREE.Color(0x0a0d13);          // nodata / outside AOI: void
-    else if (obs > 0) col = new THREE.Color(0x2b3550);    // buildings: slate
+    else if (obs > 0) col = new THREE.Color(0x2b3550);    // walls (no bldg layer): slate
     else {
       const t = (e - zmin) / Math.max(zmax - zmin, 1e-6);
       col = new THREE.Color().setHSL(0.30 - 0.12 * t, 0.35, 0.18 + 0.30 * t);

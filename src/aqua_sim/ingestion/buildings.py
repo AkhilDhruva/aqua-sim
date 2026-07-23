@@ -369,13 +369,47 @@ def export_buildings_json(collection: BuildingCollection, grid: Grid,
         return best if best is not None else grid.z[min(max((j0 + j1) // 2, 0), grid.ny - 1)][
             min(max((i0 + i1) // 2, 0), grid.nx - 1)]
 
+    def _ring_area(ring):
+        s = 0.0
+        for (x1, y1), (x2, y2) in zip(ring, ring[1:] + ring[:1]):
+            s += x1 * y2 - x2 * y1
+        return 0.5 * s
+
+    def _refined(polygons):
+        """Dataset refinement: drop degenerate rings (<3 distinct points) and
+        sub-1 m² slivers — Earcut turns them into flipped/dark roof triangles."""
+        out = []
+        for poly in polygons:
+            rings = []
+            for k, ring in enumerate(poly):
+                pts = []
+                for p in ring:
+                    if not pts or abs(pts[-1][0] - p[0]) > 1e-6 or abs(pts[-1][1] - p[1]) > 1e-6:
+                        pts.append((p[0], p[1]))
+                if len(pts) > 1 and pts[0] == pts[-1]:
+                    pts.pop()
+                if len(pts) < 3 or abs(_ring_area(pts)) < 1.0:
+                    if k == 0:
+                        rings = None      # outer degenerate -> drop whole part
+                        break
+                    continue              # skip sliver hole
+                rings.append(pts)
+            if rings:
+                out.append(rings)
+        return out
+
     tiles: dict[tuple[int, int], dict] = {}
     exported = 0
+    dropped_parts = 0
     for b in collection.buildings:
         if b.height_m < min_height_m:
             continue
+        polys = _refined(b.polygons)
+        if not polys:
+            dropped_parts += 1
+            continue
         exported += 1
-        pts = [(p[0] - left, top - p[1]) for p in b.all_points()]
+        pts = [(p[0] - left, top - p[1]) for poly in polys for ring in poly for p in ring]
         lx = [p[0] for p in pts]; ly = [p[1] for p in pts]
         cx, cy = sum(lx) / len(lx), sum(ly) / len(ly)
         key = (int(cx // tile_m), int(cy // tile_m))
@@ -390,7 +424,7 @@ def export_buildings_json(collection: BuildingCollection, grid: Grid,
             "cells": [i0, j0, i1, j1],
             # One entry per polygon part; ring[0] outer, rest holes.
             "polys": [[[[round(p[0] - left, 2), round(top - p[1], 2)] for p in ring]
-                       for ring in poly] for poly in b.polygons],
+                       for ring in poly] for poly in polys],
         })
 
     doc = {
@@ -403,6 +437,8 @@ def export_buildings_json(collection: BuildingCollection, grid: Grid,
         "tile_count": len(tiles),
         "building_count": exported,
         "min_height_m": min_height_m,
+        "refinement": {"dropped_degenerate_buildings": dropped_parts,
+                       "min_ring_area_m2": 1.0},
         "provenance": collection.provenance,
         "presets": presets or [],
         "tiles": sorted(tiles.values(), key=lambda t: (t["key"][1], t["key"][0])),

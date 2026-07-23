@@ -1,0 +1,74 @@
+[
+  {
+    "time_s": 8100.0,
+    "severity": "CRITICAL",
+    "location": "Low Point 2",
+    "message": "Breach detected at Low Point 2. Est. full inundation in ~32 min."
+  },
+  {
+    "time_s": 9000.0,
+    "severity": "CRITICAL",
+    "location": "Low Point 6",
+    "message": "Breach detected at Low Point 6. Est. full inundation in ~25 min."
+  },
+  {
+    "time_s": 9900.0,
+    "severity": "CRITICAL",
+    "location": "Low Point 3",
+    "message": "Breach detected at Low Point 3. Est. full inundation in ~28 min."
+  },
+  {
+    "time_s": 10800.0,
+    "severity": "CRITICAL",
+    "location": "Low Point 4",
+    "message": "Breach detected at Low Point 4. Est. full inundation in ~31 min."
+  },
+  {
+    "time_s": 13500.0,
+    "severity": "CRITICAL",
+    "location": "Low Point 1",
+    "message": "Breach detected at Low Point 1. Est. full inundation in ~28 min."
+  },
+  {
+    "time_s": 5400.0,
+    "severity": "WARNING",
+    "location": "Low Point 1",
+    "message": "Surface water approaching critical threshold at Low Point 1 (head -0.13 m)."
+  },
+  {
+    "time_s": 5400.0,
+    "severity": "WARNING",
+    "location": "Low Point 2",
+    "message": "Surface water approaching critical threshold at Low Point 2 (head -0.15 m)."
+  },
+  {
+    "time_s": 6300.0,
+    "severity": "WARNING",
+    "location": "Low Point 3",
+    "message": "Surface water approaching critical threshold at Low Point 3 (head -0.12 m)."
+  },
+  {
+    "time_s": 6300.0,
+    "severity": "WARNING",
+    "location": "Low Point 4",
+    "message": "Surface water approaching critical threshold at Low Point 4 (head -0.12 m)."
+  },
+  {
+    "time_s": 6300.0,
+    "severity": "WARNING",
+    "location": "Low Point 5",
+    "message": "Surface water approaching critical threshold at Low Point 5 (head -0.14 m)."
+  },
+  {
+    "time_s": 6300.0,
+    "severity": "WARNING",
+    "location": "Low Point 6",
+    "message": "Surface water approaching critical threshold at Low Point 6 (head -0.12 m)."
+  },
+  {
+    "time_s": 7200.0,
+    "severity": "WARNING",
+    "location": "domain",
+    "message": "Peak surface-flow hazard reached EXTREME (depth\u00d7velocity rating) at t=120 min."
+  }
+]

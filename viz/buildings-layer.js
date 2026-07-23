@@ -16,8 +16,10 @@ import * as THREE from 'three';
 const LOD_SWITCH_M = 1800;         // camera distance where LOD0 -> LOD1
 
 function mergeNonIndexed(geoms) {
-  // Position-only merge — the flatShading materials derive face normals in the
-  // shader, so a per-vertex normal buffer would be dead weight (~2x memory).
+  // Merge with REAL face normals. (A position-only merge relying on
+  // flatShading's derivative normals renders roofs near-unlit on this
+  // pipeline — computed per-face normals through the standard shader path are
+  // reliable, and non-indexed geometry keeps the faceted look.)
   let vtx = 0;
   for (const g of geoms) vtx += g.attributes.position.count;
   const pos = new Float32Array(vtx * 3);
@@ -31,24 +33,43 @@ function mergeNonIndexed(geoms) {
   }
   const merged = new THREE.BufferGeometry();
   merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  merged.computeVertexNormals();   // non-indexed => true per-face normals
   merged.computeBoundingSphere();
   return { merged, ranges };
 }
 
+// Clean a ring for triangulation: scene-plane points, consecutive duplicates
+// removed, closing point dropped. Returns null for degenerate (<3 pts) rings.
+function cleanRing(ring, W, H) {
+  const pts = [];
+  for (const [lx, ly] of ring) {
+    const x = lx - W / 2, y = -(ly - H / 2);
+    const prev = pts[pts.length - 1];
+    if (!prev || Math.abs(prev.x - x) > 1e-6 || Math.abs(prev.y - y) > 1e-6) {
+      pts.push(new THREE.Vector2(x, y));
+    }
+  }
+  if (pts.length > 1 && pts[0].distanceToSquared(pts[pts.length - 1]) < 1e-12) pts.pop();
+  return pts.length >= 3 ? pts : null;
+}
+
 function shapeFromPolygon(poly, W, H) {
   // ring[0] outer, rest holes; (x, -z) so rotateX(-90deg) yields y-up, z-south.
-  const shape = new THREE.Shape();
-  poly[0].forEach(([lx, ly], i) => {
-    const sx = lx - W / 2, sy = -(ly - H / 2);
-    if (i === 0) shape.moveTo(sx, sy); else shape.lineTo(sx, sy);
-  });
+  //
+  // Winding is NORMALIZED here — the source data mixes ring orientations
+  // (ESRI CW vs GeoJSON CCW), and with flat shading (derivative normals) the
+  // wrong orientation renders as dark patches on roofs. The shape plane maps
+  // sy = -sceneZ (y mirrored), so a ring that must read CCW *from above in the
+  // scene* must be CW in shape space: outer -> CW (negative area), holes -> CCW.
+  const outer = cleanRing(poly[0], W, H);
+  if (!outer) return null;
+  if (THREE.ShapeUtils.area(outer) > 0) outer.reverse();       // outer -> CW (up-facing cap)
+  const shape = new THREE.Shape(outer);
   for (let r = 1; r < poly.length; r++) {
-    const hole = new THREE.Path();
-    poly[r].forEach(([lx, ly], i) => {
-      const sx = lx - W / 2, sy = -(ly - H / 2);
-      if (i === 0) hole.moveTo(sx, sy); else hole.lineTo(sx, sy);
-    });
-    shape.holes.push(hole);
+    const hole = cleanRing(poly[r], W, H);
+    if (!hole) continue;
+    if (THREE.ShapeUtils.area(hole) < 0) hole.reverse();       // holes -> CCW
+    shape.holes.push(new THREE.Path(hole));
   }
   return shape;
 }
@@ -91,10 +112,13 @@ export class BuildingsLayer {
     scene.add(this.group);
     this.pickMeshes = [];   // LOD0 meshes with .userData.pick = {ranges, buildings}
     this.doc = null;
+    // No flatShading: merged geometry carries true per-face normals (see
+    // mergeNonIndexed), which gives the same faceted look via the reliable
+    // normal-attribute shader path.
     this.matNear = new THREE.MeshStandardMaterial({
-      color: 0x8b93a7, roughness: 0.85, metalness: 0.05, flatShading: true });
+      color: 0x8b93a7, roughness: 0.85, metalness: 0.05 });
     this.matFar = new THREE.MeshStandardMaterial({
-      color: 0x767e91, roughness: 0.95, flatShading: true });
+      color: 0x767e91, roughness: 0.95 });
   }
 
   clear() {
