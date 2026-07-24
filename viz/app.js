@@ -10,6 +10,14 @@ import { OrbitControls } from './vendor/OrbitControls.js';
 import { PALETTES, DEFAULT_PALETTE, THRESHOLDS, paletteUniforms } from './palettes.js';
 import { BuildingsLayer, buildingFloodStats } from './buildings-layer.js';
 
+//: Most simultaneous breach banners drawn over the canvas; the rest are
+//: summarized. A metro run with many sensors would otherwise bury the map.
+const MAX_BANNERS = 3;
+//: Sensor markers are scaled per-frame to hold a roughly constant on-screen
+//: size (like a map pin) instead of a fixed fraction of the domain — a 48 km
+//: metro domain otherwise produces kilometre-tall pins and unreadable labels.
+const MARKER_SCREEN_FRACTION = 0.045;
+
 const state = {
   manifest: null,
   terrain: null,
@@ -212,28 +220,32 @@ function buildScene() {
   state.scene.add(wMesh);
 
   // ----- sink-node markers (subway stations etc.) -----
+  // Built at UNIT size around the origin and positioned via group.position, so
+  // updateMarkerScale() can rescale them per frame to a constant on-screen
+  // size (see MARKER_SCREEN_FRACTION).
   const cxg = (nx - 1) / 2, cyg = (ny - 1) / 2;
-  const pinH = Math.max(W, H) * 0.03;
-  const pinR = Math.max(W, H) * 0.004;
   for (const node of state.nodes) {
     if (node.x == null || node.y == null) continue;
     const gx = (node.x - cxg) * dx, gz = (node.y - cyg) * dx;
     const gy = (terrain.z[node.y]?.[node.x] || 0) * state.vertExag;
     const group = new THREE.Group();
+    group.position.set(gx, gy, gz);
     const pin = new THREE.Mesh(
-      new THREE.ConeGeometry(pinR, pinH, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    pin.position.set(gx, gy + pinH / 2, gz);
+      new THREE.ConeGeometry(0.13, 1.0, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }));
+    pin.position.set(0, 0.5, 0);
     pin.rotation.x = Math.PI;  // point down at the station
+    pin.renderOrder = 10;
     group.add(pin);
     const label = makeTextSprite(node.name);
-    const lh = pinH * 0.7;  // label height in world units
-    label.scale.set(lh * label.userData.aspect, lh, 1);
-    label.position.set(gx, gy + pinH * 1.5, gz);
+    label.scale.set(0.7 * label.userData.aspect, 0.7, 1);
+    label.position.set(0, 1.5, 0);
+    label.renderOrder = 11;
     group.add(label);
     state.scene.add(group);
     state.nodeMarkers.push({ node, pin, group, baseColor: 0xffffff });
   }
+  updateMarkerScale();
 
   // camera framing
   const span = Math.max(W, H);
@@ -444,6 +456,20 @@ function buildBasemap() {
   tryLoadBasemapTiles(plane);
 }
 
+// Keep sensor markers a constant apparent size regardless of camera distance
+// or domain extent (a map-pin, not a kilometre-tall cone on a metro domain).
+const _mkV = new THREE.Vector3();
+function updateMarkerScale() {
+  if (!state.camera || !state.nodeMarkers.length) return;
+  const vFov = (state.camera.fov * Math.PI) / 180;
+  for (const m of state.nodeMarkers) {
+    const dist = _mkV.copy(m.group.position).distanceTo(state.camera.position);
+    // World height that subtends MARKER_SCREEN_FRACTION of the viewport height.
+    const s = 2 * Math.tan(vFov / 2) * dist * MARKER_SCREEN_FRACTION;
+    m.group.scale.setScalar(Math.max(s, 1e-3));
+  }
+}
+
 function terrainMinMax() {
   let a = Infinity, b = -Infinity;
   const t = state.terrain;
@@ -626,10 +652,16 @@ function updateAlerts(fr) {
     m.pin.scale.setScalar(hot ? 1.6 : 1.0);
   }
 
-  // Overlay banners for breaches active on THIS frame.
+  // Overlay banners for breaches active on THIS frame. Capped: a metro run
+  // with many sensors would otherwise stack banners over the whole canvas.
+  // Show the most severe (highest inundation rate) first, summarize the rest.
   const overlay = document.getElementById('overlay');
   overlay.innerHTML = '';
-  (fr.breaches || []).forEach((b) => {
+  const allBreaches = [...(fr.breaches || [])]
+    .sort((a, b) => (b.inundation_rate_m3_s || 0) - (a.inundation_rate_m3_s || 0));
+  const shown = allBreaches.slice(0, MAX_BANNERS);
+  const hidden = allBreaches.length - shown.length;
+  shown.forEach((b) => {
     const div = document.createElement('div');
     div.className = 'breach-banner';
     div.innerHTML =
@@ -638,6 +670,13 @@ function updateAlerts(fr) {
       `&nbsp;|&nbsp; head ${b.head_m} m &nbsp; (${Math.round(b.fraction_full * 100)}% full)`;
     overlay.appendChild(div);
   });
+  if (hidden > 0) {
+    const more = document.createElement('div');
+    more.className = 'breach-more';
+    more.textContent = `+ ${hidden} more sensor${hidden > 1 ? 's' : ''} breaching ` +
+      `(see alert matrix)`;
+    overlay.appendChild(more);
+  }
 }
 
 function seekToTime(t) {
@@ -692,6 +731,7 @@ function tick(ts) {
   }
   if (state.controls) state.controls.update();
   if (state.buildings && state.camera) state.buildings.update(state.camera);
+  updateMarkerScale();
   if (state.renderer) state.renderer.render(state.scene, state.camera);
 }
 
