@@ -51,13 +51,37 @@ python -m aqua_sim run output/run  # full Manhattan demo: solver -> risk -> fram
 pytest                             # test suite (physics validation + end-to-end)
 ```
 
-Run on a **real DEM** (adds rasterio/numpy/pyproj):
+Run on a **real DEM** (adds rasterio/numpy):
 
 ```bash
 pip install -e ".[geo]"
 python -m aqua_sim.ingestion.fetch manhattan_3dep.tif        # USGS 3DEP (needs egress)
 python -m aqua_sim run output/mn --dem manhattan_3dep.tif    # reproject -> solve -> frames
 ```
+
+Run a **named area** — tiles are mosaicked automatically, and each run is
+labeled *street* vs *screening* resolution so the two are never confused:
+
+```bash
+# Complete New York area: Staten Island -> Long Island, 3 USGS tiles
+python -m aqua_sim run output/ny --area ny \
+  --dem USGS_13_n41w075.tif --dem USGS_13_n41w074.tif --dem USGS_13_n41w073.tif
+
+# Five boroughs, finer, with official building footprints as no-flow walls
+python -m aqua_sim run output/metro --area metro --dx 30 \
+  --dem USGS_13_n41w074.tif --dem USGS_13_n41w075.tif \
+  --buildings nyc_building_footprints.gpkg
+```
+
+| `--area` | Extent | Default `--dx` |
+|---|---|---|
+| `ny` | Staten Island → Long Island | 250 m (screening) |
+| `metro` | Five boroughs | 120 m (screening) |
+| `manhattan` | Manhattan + waterfront | 20 m |
+
+At `--dx ≤ 10` building footprints become closed no-flow cells (water routes
+through the streets); above that they stay coverage-only — see
+[docs/CONDITIONING.md](docs/CONDITIONING.md).
 
 View a run in the **3D telemetry dashboard**:
 
