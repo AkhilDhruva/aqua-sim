@@ -1,0 +1,595 @@
+{
+ "derived_from_run_id": "7664097b73406bcd",
+ "method": "4-connected component of mask & z>=0.5 m containing the Times Sq-42 St sensor cell (separates Manhattan from the Hudson, which has bathymetry, and from the East River, whose DEM surface lies at 0-0.5 m); statistics over that component only",
+ "manhattan_component_km2": 26.6,
+ "manhattan_peak": {
+  "max_depth_m": 3.6979,
+  "cell": [
+   449,
+   81
+  ],
+  "z_m": 11.48,
+  "lonlat": [
+   -73.97185,
+   40.76781
+  ]
+ },
+ "area_ha_over_threshold": {
+  "0.05": 382.7,
+  "0.1": 220.2,
+  "0.3": 80.6,
+  "0.5": 45.7,
+  "1.0": 18.4,
+  "2.0": 3.0
+ },
+ "pool_count_over_0p5m": 658,
+ "pools_over_0p5m": [
+  {
+   "cells": 420,
+   "ha": 4.2,
+   "max_depth_m": 3.48,
+   "mean_depth_m": 1.16,
+   "peak_volume_m3": 48822,
+   "z_mean_m": 4.88,
+   "z_min_m": 2.63,
+   "lonlat": [
+    -74.00069,
+    40.73293
+   ]
+  },
+  {
+   "cells": 266,
+   "ha": 2.66,
+   "max_depth_m": 2.09,
+   "mean_depth_m": 1.05,
+   "peak_volume_m3": 28052,
+   "z_mean_m": 1.61,
+   "z_min_m": 0.57,
+   "lonlat": [
+    -74.00346,
+    40.72187
+   ]
+  },
+  {
+   "cells": 254,
+   "ha": 2.54,
+   "max_depth_m": 3.14,
+   "mean_depth_m": 1.93,
+   "peak_volume_m3": 49030,
+   "z_mean_m": 7.91,
+   "z_min_m": 6.7,
+   "lonlat": [
+    -73.97543,
+    40.76595
+   ]
+  },
+  {
+   "cells": 156,
+   "ha": 1.56,
+   "max_depth_m": 3.7,
+   "mean_depth_m": 1.64,
+   "peak_volume_m3": 25578,
+   "z_mean_m": 13.1,
+   "z_min_m": 11.48,
+   "lonlat": [
+    -73.97185,
+    40.76781
+   ]
+  },
+  {
+   "cells": 128,
+   "ha": 1.28,
+   "max_depth_m": 1.52,
+   "mean_depth_m": 0.96,
+   "peak_volume_m3": 12333,
+   "z_mean_m": 13.85,
+   "z_min_m": 13.29,
+   "lonlat": [
+    -73.96701,
+    40.77398
+   ]
+  },
+  {
+   "cells": 119,
+   "ha": 1.19,
+   "max_depth_m": 2.19,
+   "mean_depth_m": 1.33,
+   "peak_volume_m3": 15866,
+   "z_mean_m": 6.93,
+   "z_min_m": 6.08,
+   "lonlat": [
+    -73.99835,
+    40.75417
+   ]
+  },
+  {
+   "cells": 83,
+   "ha": 0.83,
+   "max_depth_m": 1.31,
+   "mean_depth_m": 0.79,
+   "peak_volume_m3": 6571,
+   "z_mean_m": 3.74,
+   "z_min_m": 3.22,
+   "lonlat": [
+    -74.00421,
+    40.7108
+   ]
+  },
+  {
+   "cells": 73,
+   "ha": 0.73,
+   "max_depth_m": 0.55,
+   "mean_depth_m": 0.52,
+   "peak_volume_m3": 3817,
+   "z_mean_m": 5.76,
+   "z_min_m": 5.72,
+   "lonlat": [
+    -73.99091,
+    40.76879
+   ]
+  },
+  {
+   "cells": 57,
+   "ha": 0.57,
+   "max_depth_m": 0.92,
+   "mean_depth_m": 0.63,
+   "peak_volume_m3": 3619,
+   "z_mean_m": 1.61,
+   "z_min_m": 1.32,
+   "lonlat": [
+    -74.00733,
+    40.74821
+   ]
+  },
+  {
+   "cells": 54,
+   "ha": 0.54,
+   "max_depth_m": 1.93,
+   "mean_depth_m": 1.11,
+   "peak_volume_m3": 5969,
+   "z_mean_m": 2.63,
+   "z_min_m": 1.81,
+   "lonlat": [
+    -74.00216,
+    40.72114
+   ]
+  },
+  {
+   "cells": 48,
+   "ha": 0.48,
+   "max_depth_m": 0.74,
+   "mean_depth_m": 0.6,
+   "peak_volume_m3": 2862,
+   "z_mean_m": 1.36,
+   "z_min_m": 1.22,
+   "lonlat": [
+    -74.00689,
+    40.75379
+   ]
+  },
+  {
+   "cells": 37,
+   "ha": 0.37,
+   "max_depth_m": 1.74,
+   "mean_depth_m": 1.02,
+   "peak_volume_m3": 3771,
+   "z_mean_m": 2.21,
+   "z_min_m": 1.49,
+   "lonlat": [
+    -74.00379,
+    40.74719
+   ]
+  },
+  {
+   "cells": 36,
+   "ha": 0.36,
+   "max_depth_m": 1.87,
+   "mean_depth_m": 1.1,
+   "peak_volume_m3": 3955,
+   "z_mean_m": 1.47,
+   "z_min_m": 0.7,
+   "lonlat": [
+    -74.0047,
+    40.74999
+   ]
+  },
+  {
+   "cells": 35,
+   "ha": 0.35,
+   "max_depth_m": 1.6,
+   "mean_depth_m": 0.67,
+   "peak_volume_m3": 2341,
+   "z_mean_m": 1.55,
+   "z_min_m": 0.61,
+   "lonlat": [
+    -74.00665,
+    40.74586
+   ]
+  },
+  {
+   "cells": 35,
+   "ha": 0.35,
+   "max_depth_m": 1.75,
+   "mean_depth_m": 1.09,
+   "peak_volume_m3": 3831,
+   "z_mean_m": 5.56,
+   "z_min_m": 4.9,
+   "lonlat": [
+    -73.99984,
+    40.74229
+   ]
+  },
+  {
+   "cells": 33,
+   "ha": 0.33,
+   "max_depth_m": 0.88,
+   "mean_depth_m": 0.64,
+   "peak_volume_m3": 2123,
+   "z_mean_m": 1.61,
+   "z_min_m": 1.37,
+   "lonlat": [
+    -74.0144,
+    40.71035
+   ]
+  },
+  {
+   "cells": 32,
+   "ha": 0.32,
+   "max_depth_m": 2.46,
+   "mean_depth_m": 1.34,
+   "peak_volume_m3": 4275,
+   "z_mean_m": 2.69,
+   "z_min_m": 1.56,
+   "lonlat": [
+    -74.00477,
+    40.72936
+   ]
+  },
+  {
+   "cells": 32,
+   "ha": 0.32,
+   "max_depth_m": 2.89,
+   "mean_depth_m": 1.32,
+   "peak_volume_m3": 4210,
+   "z_mean_m": 5.05,
+   "z_min_m": 3.48,
+   "lonlat": [
+    -74.00032,
+    40.72581
+   ]
+  },
+  {
+   "cells": 31,
+   "ha": 0.31,
+   "max_depth_m": 3.01,
+   "mean_depth_m": 1.33,
+   "peak_volume_m3": 4118,
+   "z_mean_m": 3.9,
+   "z_min_m": 2.22,
+   "lonlat": [
+    -74.00133,
+    40.74501
+   ]
+  },
+  {
+   "cells": 31,
+   "ha": 0.31,
+   "max_depth_m": 1.68,
+   "mean_depth_m": 1.06,
+   "peak_volume_m3": 3297,
+   "z_mean_m": 3.79,
+   "z_min_m": 3.17,
+   "lonlat": [
+    -74.00128,
+    40.72465
+   ]
+  },
+  {
+   "cells": 30,
+   "ha": 0.3,
+   "max_depth_m": 2.54,
+   "mean_depth_m": 1.48,
+   "peak_volume_m3": 4455,
+   "z_mean_m": 4.93,
+   "z_min_m": 3.87,
+   "lonlat": [
+    -73.99968,
+    40.72121
+   ]
+  },
+  {
+   "cells": 29,
+   "ha": 0.29,
+   "max_depth_m": 0.79,
+   "mean_depth_m": 0.64,
+   "peak_volume_m3": 1854,
+   "z_mean_m": 4.04,
+   "z_min_m": 3.88,
+   "lonlat": [
+    -73.99083,
+    40.77365
+   ]
+  },
+  {
+   "cells": 29,
+   "ha": 0.29,
+   "max_depth_m": 0.79,
+   "mean_depth_m": 0.64,
+   "peak_volume_m3": 1853,
+   "z_mean_m": 4.79,
+   "z_min_m": 4.67,
+   "lonlat": [
+    -73.96592,
+    40.75244
+   ]
+  },
+  {
+   "cells": 29,
+   "ha": 0.29,
+   "max_depth_m": 1.65,
+   "mean_depth_m": 0.87,
+   "peak_volume_m3": 2525,
+   "z_mean_m": 2.46,
+   "z_min_m": 1.62,
+   "lonlat": [
+    -74.00238,
+    40.74655
+   ]
+  },
+  {
+   "cells": 28,
+   "ha": 0.28,
+   "max_depth_m": 2.0,
+   "mean_depth_m": 1.25,
+   "peak_volume_m3": 3499,
+   "z_mean_m": 2.78,
+   "z_min_m": 2.03,
+   "lonlat": [
+    -73.99997,
+    40.7568
+   ]
+  }
+ ],
+ "series": [
+  {
+   "t_h": 0.0,
+   "max_depth_m": 0.0,
+   "ha_gt_0p1": 0.0,
+   "ha_gt_0p3": 0.0,
+   "ha_gt_0p5": 0.0
+  },
+  {
+   "t_h": 0.25,
+   "max_depth_m": 0.0,
+   "ha_gt_0p1": 0.0,
+   "ha_gt_0p3": 0.0,
+   "ha_gt_0p5": 0.0
+  },
+  {
+   "t_h": 0.5,
+   "max_depth_m": 0.0,
+   "ha_gt_0p1": 0.0,
+   "ha_gt_0p3": 0.0,
+   "ha_gt_0p5": 0.0
+  },
+  {
+   "t_h": 0.75,
+   "max_depth_m": 0.0,
+   "ha_gt_0p1": 0.0,
+   "ha_gt_0p3": 0.0,
+   "ha_gt_0p5": 0.0
+  },
+  {
+   "t_h": 1.0,
+   "max_depth_m": 0.0,
+   "ha_gt_0p1": 0.0,
+   "ha_gt_0p3": 0.0,
+   "ha_gt_0p5": 0.0
+  },
+  {
+   "t_h": 1.25,
+   "max_depth_m": 1.202,
+   "ha_gt_0p1": 29.8,
+   "ha_gt_0p3": 3.8,
+   "ha_gt_0p5": 0.6
+  },
+  {
+   "t_h": 1.5,
+   "max_depth_m": 2.202,
+   "ha_gt_0p1": 100.5,
+   "ha_gt_0p3": 21.1,
+   "ha_gt_0p5": 8.0
+  },
+  {
+   "t_h": 1.75,
+   "max_depth_m": 2.627,
+   "ha_gt_0p1": 164.2,
+   "ha_gt_0p3": 41.8,
+   "ha_gt_0p5": 18.1
+  },
+  {
+   "t_h": 2.0,
+   "max_depth_m": 3.008,
+   "ha_gt_0p1": 192.0,
+   "ha_gt_0p3": 59.0,
+   "ha_gt_0p5": 29.4
+  },
+  {
+   "t_h": 2.25,
+   "max_depth_m": 3.159,
+   "ha_gt_0p1": 177.6,
+   "ha_gt_0p3": 63.5,
+   "ha_gt_0p5": 33.9
+  },
+  {
+   "t_h": 2.5,
+   "max_depth_m": 3.27,
+   "ha_gt_0p1": 161.6,
+   "ha_gt_0p3": 64.5,
+   "ha_gt_0p5": 36.8
+  },
+  {
+   "t_h": 2.75,
+   "max_depth_m": 3.346,
+   "ha_gt_0p1": 153.3,
+   "ha_gt_0p3": 66.0,
+   "ha_gt_0p5": 38.8
+  },
+  {
+   "t_h": 3.0,
+   "max_depth_m": 3.358,
+   "ha_gt_0p1": 150.8,
+   "ha_gt_0p3": 67.5,
+   "ha_gt_0p5": 40.4
+  },
+  {
+   "t_h": 3.25,
+   "max_depth_m": 3.441,
+   "ha_gt_0p1": 140.3,
+   "ha_gt_0p3": 65.9,
+   "ha_gt_0p5": 40.9
+  },
+  {
+   "t_h": 3.5,
+   "max_depth_m": 3.48,
+   "ha_gt_0p1": 129.0,
+   "ha_gt_0p3": 64.1,
+   "ha_gt_0p5": 40.8
+  },
+  {
+   "t_h": 3.75,
+   "max_depth_m": 3.445,
+   "ha_gt_0p1": 121.2,
+   "ha_gt_0p3": 63.1,
+   "ha_gt_0p5": 40.5
+  },
+  {
+   "t_h": 4.0,
+   "max_depth_m": 3.445,
+   "ha_gt_0p1": 115.7,
+   "ha_gt_0p3": 62.3,
+   "ha_gt_0p5": 40.3
+  },
+  {
+   "t_h": 4.25,
+   "max_depth_m": 3.359,
+   "ha_gt_0p1": 109.7,
+   "ha_gt_0p3": 60.7,
+   "ha_gt_0p5": 39.7
+  },
+  {
+   "t_h": 4.5,
+   "max_depth_m": 3.369,
+   "ha_gt_0p1": 105.6,
+   "ha_gt_0p3": 59.3,
+   "ha_gt_0p5": 39.1
+  },
+  {
+   "t_h": 4.75,
+   "max_depth_m": 3.344,
+   "ha_gt_0p1": 102.2,
+   "ha_gt_0p3": 58.1,
+   "ha_gt_0p5": 38.7
+  },
+  {
+   "t_h": 5.0,
+   "max_depth_m": 3.444,
+   "ha_gt_0p1": 99.1,
+   "ha_gt_0p3": 57.2,
+   "ha_gt_0p5": 38.1
+  },
+  {
+   "t_h": 5.25,
+   "max_depth_m": 3.394,
+   "ha_gt_0p1": 96.8,
+   "ha_gt_0p3": 56.5,
+   "ha_gt_0p5": 37.8
+  },
+  {
+   "t_h": 5.5,
+   "max_depth_m": 3.321,
+   "ha_gt_0p1": 94.7,
+   "ha_gt_0p3": 55.8,
+   "ha_gt_0p5": 37.2
+  },
+  {
+   "t_h": 5.75,
+   "max_depth_m": 3.503,
+   "ha_gt_0p1": 92.9,
+   "ha_gt_0p3": 54.9,
+   "ha_gt_0p5": 36.7
+  },
+  {
+   "t_h": 6.0,
+   "max_depth_m": 3.698,
+   "ha_gt_0p1": 91.3,
+   "ha_gt_0p3": 54.1,
+   "ha_gt_0p5": 36.3
+  }
+ ],
+ "sensors": [
+  {
+   "name": "28 St (1)",
+   "lonlat": [
+    -73.99217,
+    40.74781
+   ],
+   "z_m": 10.76,
+   "max_depth_m": 0.057,
+   "in_manhattan": true
+  },
+  {
+   "name": "Times Sq-42 St",
+   "lonlat": [
+    -73.98814,
+    40.75624
+   ],
+   "z_m": 15.39,
+   "max_depth_m": 0.019,
+   "in_manhattan": true
+  },
+  {
+   "name": "Low Point 1",
+   "lonlat": [
+    -73.9667,
+    40.71741
+   ],
+   "z_m": 1.0,
+   "max_depth_m": 0.016,
+   "in_manhattan": false
+  },
+  {
+   "name": "Low Point 2",
+   "lonlat": [
+    -73.958,
+    40.74399
+   ],
+   "z_m": 1.0,
+   "max_depth_m": 0.017,
+   "in_manhattan": false
+  },
+  {
+   "name": "Low Point 3",
+   "lonlat": [
+    -73.95818,
+    40.72454
+   ],
+   "z_m": 1.0,
+   "max_depth_m": 0.009,
+   "in_manhattan": false
+  },
+  {
+   "name": "Low Point 4",
+   "lonlat": [
+    -73.99474,
+    40.70306
+   ],
+   "z_m": 1.0,
+   "max_depth_m": 0.023,
+   "in_manhattan": false
+  }
+ ],
+ "all_cells_peak_m": 10.3948,
+ "all_cells_peak_note": "the all-cell peak (10.39 m) is a 107-cell depression on the New Jersey side of the Hudson at (-74.0227, 40.7662), inside the bbox but outside Manhattan",
+ "note": "TERRAIN ONLY run: bare-earth DEM, uniform 22 mm/h effective drainage (44 mm/h at 0.5 blockage), no sewer network, no buildings. Closed depressions in the DEM (including Central Park's ponds) fill until they overtop; river surfaces without bathymetry hold ponded rain. These are model properties, not observations."
+}

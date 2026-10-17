@@ -2,7 +2,7 @@
 """Bundle the holo table and one run into a single self-contained HTML fragment.
 
 Usage: python3 viz/holo/build_artifact.py <run_dir> <out.html> [--three-url URL]
-                                          [--cell-stride N] [--frame-stride M]
+                                          [--cell-stride N] [--frame-stride M] [--title T]
 
 The served page (index.html + holo.js) fetches a run folder and imports Three.js
 from ../vendor. A hosted artifact can do neither, so this script:
@@ -114,6 +114,7 @@ def main():
     if "--three-url" in sys.argv:
         three_urls = [sys.argv[sys.argv.index("--three-url") + 1]] + three_urls
     cell_stride = int(sys.argv[sys.argv.index("--cell-stride") + 1]) if "--cell-stride" in sys.argv else 1
+    page_title = sys.argv[sys.argv.index("--title") + 1] if "--title" in sys.argv else None
     frame_stride = int(sys.argv[sys.argv.index("--frame-stride") + 1]) if "--frame-stride" in sys.argv else 1
 
     manifest = json.load(open(os.path.join(run_dir, "manifest.json")))
@@ -145,7 +146,7 @@ def main():
     js = js.replace("import { OrbitControls } from '../vendor/OrbitControls.js';", "/* OrbitControls inlined below */\n" + orbit + "\n")
     js = js.replace("</script", "<\\/script")
 
-    title = re.search(r"<title>(.*?)</title>", html, re.S).group(1)
+    title = page_title or re.search(r"<title>(.*?)</title>", html, re.S).group(1)
     link = re.search(r"<link rel=\"stylesheet\"[^>]*>", html).group(0)
     style = re.search(r"<style>.*?</style>", html, re.S).group(0)
     body = re.search(r"<body>(.*)</body>", html, re.S).group(1)

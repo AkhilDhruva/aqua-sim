@@ -1,0 +1,20 @@
+[
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "28 St (1)",
+    "message": "Surface water approaching critical threshold at 28 St (1) (head -0.03 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Times Sq-42 St",
+    "message": "Surface water approaching critical threshold at Times Sq-42 St (head -0.04 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "domain",
+    "message": "Peak surface-flow hazard reached EXTREME (depth\u00d7velocity rating) at t=75 min."
+  }
+]
