@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holo Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ------------------------------------------------------------------
+   aqua-sim · HOLO TABLE
+   A tactical-table rendering of a completed run: the solver's frames
+   drawn as a glowing contour terrain, a luminous water surface with
+   flow streaks, sensor beams with data cards, and a telemetry HUD.
+   Single committed look (dark); it is a holographic display, not a page.
+   ------------------------------------------------------------------ */
+:root{
+  color-scheme: dark;
+  --bg:#05080c; --panel:rgba(6,14,20,.74); --edge:rgba(63,233,255,.22); --edge2:rgba(63,233,255,.55);
+  --cy:#3fe9ff; --cy2:#19a7b8; --cy3:#0b3a46; --am:#ffb347; --or:#ff7a2a; --hot:#ff3b3b;
+  --ink:#d2dee3; --ink2:#8fa7ae; --dim:#4a6a74;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:12px;line-height:1.45;overflow:hidden;
+     -webkit-font-smoothing:antialiased}
+#stage{position:fixed;inset:0;display:block;background:var(--bg)}
+
+/* ---- HUD scaffold --------------------------------------------------- */
+.hud{position:fixed;inset:0;pointer-events:none;padding:14px 16px;display:grid;
+     grid-template-columns:260px 1fr 272px;grid-template-rows:auto 1fr auto;gap:12px}
+.panel{pointer-events:auto;background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:10px 12px;
+       position:relative;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.panel::before,.panel::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--edge2);pointer-events:none}
+.panel::before{left:-1px;top:-1px;border-right:0;border-bottom:0}
+.panel::after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+.ptitle{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--cy2);margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+.ptitle b{color:var(--cy);font-weight:500}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11px}
+.kv dt{color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-size:9.5px;padding-top:2px}
+.kv dd{margin:0;color:var(--ink);word-break:break-all}
+.kv dd.cy{color:var(--cy)}
+
+/* top bar */
+#top{grid-column:1/4;display:flex;gap:12px;align-items:stretch}
+#brand{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center}
+#brand .name{font-family:var(--sans);font-weight:600;font-size:15px;letter-spacing:.02em;color:#fff}
+#brand .name i{font-style:normal;color:var(--cy)}
+#brand .tag{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--cy2);margin-top:2px}
+#runinfo{flex:1 1 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 18px;align-content:center}
+#runinfo .kv{grid-template-columns:auto 1fr}
+#status{flex:0 0 auto;display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--ink2)}
+#status .dot{width:7px;height:7px;border-radius:50%;background:var(--cy);box-shadow:0 0 8px var(--cy)}
+#status.err .dot{background:var(--hot);box-shadow:0 0 8px var(--hot)}
+
+/* left: telemetry */
+#left{grid-column:1;grid-row:2;align-self:start;display:flex;flex-direction:column;gap:12px}
+.tele{display:grid;grid-template-columns:1fr;gap:9px}
+.t{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:0 8px;align-items:end}
+.t .lab{grid-column:1;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.t .val{grid-column:2;grid-row:1;font-size:15px;color:var(--cy);text-align:right;font-weight:500;white-space:nowrap}
+.t .val small{font-size:9.5px;color:var(--ink);margin-left:4px;opacity:.85}
+.t canvas{grid-column:1/3;grid-row:2;width:100%;height:30px;display:block;margin-top:3px}
+.t.am .val{color:var(--am)}
+
+/* right: legend, nodes, alerts */
+#right{grid-column:3;grid-row:2;align-self:start;display:flex;flex-direction:column;gap:12px;max-height:100%;min-height:0}
+#legend .bar{height:9px;border-radius:2px;margin:4px 0 3px;
+  background:linear-gradient(90deg,#0cbff2 0%,#8cffff 30%,#ffb84d 60%,#ff7326 85%,#ff3338 100%)}
+#legend .ticks{display:flex;justify-content:space-between;font-size:9px;color:var(--ink2)}
+#legend .note{font-size:9.5px;color:var(--dim);margin-top:6px;line-height:1.4}
+#nodes ul,#alerts ul{list-style:none;margin:0;padding:0}
+#nodes li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:5px 0;border-top:1px solid rgba(63,233,255,.08);cursor:pointer}
+#nodes li:first-child{border-top:0}
+#nodes li:hover .nm{color:#fff}
+#nodes .nm{color:var(--ink);font-size:11px}
+#nodes .st{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);text-align:right}
+#nodes .dp{grid-column:1/3;font-size:10px;color:var(--ink2)}
+#nodes li.breached .st{color:var(--or)}#nodes li.watch .st{color:var(--am)}#nodes li.dry .st{color:var(--dim)}
+#alerts{min-height:0;display:flex;flex-direction:column}
+#alerts ul{overflow:auto;max-height:200px;scrollbar-width:thin}
+#alerts li{padding:5px 6px;margin:0 0 4px;border-left:2px solid var(--dim);background:rgba(255,255,255,.02);font-size:10.5px;opacity:.45;cursor:pointer}
+#alerts li.live{opacity:1}
+#alerts li.CRITICAL{border-color:var(--hot)}#alerts li.WARNING{border-color:var(--am)}#alerts li.INFO{border-color:var(--cy2)}
+#alerts li.live.CRITICAL{background:rgba(255,59,59,.10)}
+#alerts li .t{display:inline;color:var(--cy);margin-right:6px}
+#alerts li .sev{font-size:9px;letter-spacing:.14em;margin-right:6px}
+#alerts li.CRITICAL .sev{color:var(--hot)}#alerts li.WARNING .sev{color:var(--am)}#alerts li.INFO .sev{color:var(--cy2)}
+
+/* bottom: transport */
+#bottom{grid-column:1/4;grid-row:3;display:grid;grid-template-columns:auto auto 1fr auto auto;gap:14px;align-items:center}
+button,select{font-family:var(--mono);font-size:11px;color:var(--cy);background:rgba(63,233,255,.06);border:1px solid var(--edge2);
+  border-radius:3px;padding:5px 10px;cursor:pointer;letter-spacing:.06em}
+button:hover,select:hover{background:rgba(63,233,255,.14)}
+button.on{background:var(--cy);color:#04141a}
+#scrub{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:linear-gradient(90deg,var(--cy) var(--p,0%),rgba(63,233,255,.18) var(--p,0%));
+  border-radius:2px;outline:0;cursor:pointer}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--cy);box-shadow:0 0 10px var(--cy);border:2px solid #04141a}
+#scrub::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--cy);border:2px solid #04141a}
+#timebox{display:grid;grid-template-columns:auto;text-align:right;line-height:1.25}
+#timebox .big{font-size:18px;color:#fff;font-weight:500;letter-spacing:.04em}
+#timebox .sm{font-size:9.5px;color:var(--ink2);letter-spacing:.1em;text-transform:uppercase}
+#scale{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:var(--ink2);letter-spacing:.1em}
+#scale .rule{height:4px;border:1px solid var(--cy);border-top:0;width:80px}
+/* plan-view minimap lives in the left column under the camera panel; height is capped so a
+   portrait grid cannot push the column off-screen */
+#minimap canvas{display:block;margin:0 auto;image-rendering:pixelated;max-width:100%;max-height:150px;width:auto;height:auto;border:1px solid rgba(63,233,255,.12)}
+.t .val{font-size:14px}
+.t .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#keys{grid-column:1/6;font-size:9.5px;color:var(--dim);letter-spacing:.06em;margin-top:-2px}
+#keys b{color:var(--ink2);font-weight:500}
+
+/* floating sensor cards (projected from 3D each frame; --lift grows when cards would overlap) */
+.card{position:fixed;left:0;top:0;--lift:22px;transform:translate(-50%,calc(-100% - var(--lift)));pointer-events:auto;cursor:pointer;
+  min-width:150px;background:rgba(5,12,16,.86);border:1px solid var(--edge2);border-radius:3px;padding:7px 9px 6px;
+  font-size:10.5px;color:var(--ink);box-shadow:0 0 18px rgba(63,233,255,.12);transition:border-color .25s}
+.card::after{content:"";position:absolute;left:50%;bottom:calc(-1 * var(--lift));width:1px;height:var(--lift);background:linear-gradient(var(--edge2),rgba(63,233,255,.15))}
+.card .nm{font-size:11px;color:#fff;letter-spacing:.04em;margin-bottom:3px;display:flex;justify-content:space-between;gap:8px}
+.card .nm i{font-style:normal;font-size:9px;letter-spacing:.14em;color:var(--cy2)}
+.card .row{display:flex;justify-content:space-between;gap:10px;color:var(--ink2)}
+.card .row b{color:var(--cy);font-weight:500}
+.card.watch{border-color:var(--am)}.card.watch .row b{color:var(--am)}.card.watch .nm i{color:var(--am)}
+.card.breached{border-color:var(--or);box-shadow:0 0 22px rgba(255,122,42,.25)}
+.card.breached .row b{color:var(--or)}.card.breached .nm i{color:var(--or);animation:blink 1.1s steps(2) infinite}
+.card.hidden{display:none}
+@keyframes blink{50%{opacity:.25}}
+
+/* loading / error */
+#load{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:10;transition:opacity .5s}
+#load.done{opacity:0;pointer-events:none}
+#load .box{width:min(420px,90vw);text-align:center}
+#load .name{font-family:var(--sans);font-size:18px;color:#fff;letter-spacing:.04em}
+#load .name i{font-style:normal;color:var(--cy)}
+#load .msg{margin:10px 0 8px;color:var(--ink2);font-size:11px;min-height:1.4em}
+#load .bar{height:3px;background:rgba(63,233,255,.15);border-radius:2px;overflow:hidden}
+#load .bar i{display:block;height:100%;width:0;background:var(--cy);box-shadow:0 0 10px var(--cy);transition:width .15s}
+
+@media (max-width:1000px){
+  .hud{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+  #left,#right{display:none}#top{grid-column:1}#bottom{grid-column:1;grid-template-columns:auto 1fr auto}
+  #runinfo{display:none}#scale,#keys,#minimap{display:none}
+}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div class="hud">
+  <div id="top" class="panel">
+    <div id="brand"><div class="name"><i>aqua-sim</i> · HOLO TABLE</div><div class="tag">flood telemetry · volumetric display</div></div>
+    <div id="runinfo">
+      <dl class="kv"><dt>run id</dt><dd class="cy" id="ri-run">—</dd><dt>area</dt><dd id="ri-aoi">—</dd></dl>
+      <dl class="kv"><dt>grid</dt><dd id="ri-grid">—</dd><dt>crs</dt><dd id="ri-crs">—</dd></dl>
+      <dl class="kv"><dt>scheme</dt><dd id="ri-scheme">—</dd><dt>terrain</dt><dd id="ri-terrain">—</dd></dl>
+      <dl class="kv"><dt>storm</dt><dd id="ri-storm">—</dd><dt>frames</dt><dd id="ri-frames">—</dd></dl>
+    </div>
+    <div id="status"><span class="dot"></span><span id="status-text">initialising</span></div>
+  </div>
+
+  <div id="left">
+    <div class="panel">
+      <div class="ptitle"><span>Telemetry</span><b id="tele-frame">f 000</b></div>
+      <div class="tele">
+        <div class="t"><span class="lab">max depth</span><span class="val"><span id="v-depth">0.00</span><small>m</small></span><canvas id="s-depth" width="230" height="30"></canvas></div>
+        <div class="t"><span class="lab">max speed</span><span class="val"><span id="v-speed">0.00</span><small>m/s</small></span><canvas id="s-speed" width="230" height="30"></canvas></div>
+        <div class="t"><span class="lab">water volume</span><span class="val"><span id="v-vol">0</span><small>m³</small></span><canvas id="s-vol" width="230" height="30"></canvas></div>
+        <div class="t am"><span class="lab">wet area</span><span class="val"><span id="v-wet">0.00</span><small>km²</small></span><canvas id="s-wet" width="230" height="30"></canvas></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ptitle"><span>Camera</span><b id="cam-mode">orbit</b></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button data-cam="1" title="key 1">overview</button><button data-cam="2" title="key 2">oblique</button><button data-cam="3" title="key 3">plan</button><button id="btn-orbit" title="key O">auto-orbit</button>
+      </div>
+    </div>
+    <div class="panel" id="minimap">
+      <div class="ptitle"><span>Plan</span><b id="mm-lab">peak</b></div>
+      <canvas id="mm" width="220" height="100"></canvas>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="panel" id="legend">
+      <div class="ptitle"><span>Water · danger</span><b id="lg-units">m</b></div>
+      <div class="bar"></div>
+      <div class="ticks"><span>shallow</span><span id="lg-caution">0.15</span><span id="lg-crit">0.50 crit</span><span>deep / fast</span></div>
+      <div class="note">danger = max(depth / D<sub>crit</sub>, depth·(speed + DF) / HR<sub>crit</sub>) using the thresholds exported in this run's manifest. Streaks flow down the water-surface gradient; their brightness scales with speed.</div>
+    </div>
+    <div class="panel" id="nodes">
+      <div class="ptitle"><span>Sensors</span><b id="nd-count">0</b></div>
+      <ul id="nd-list"></ul>
+    </div>
+    <div class="panel" id="alerts">
+      <div class="ptitle"><span>Alert feed</span><b id="al-count">0</b></div>
+      <ul id="al-list"></ul>
+    </div>
+  </div>
+
+  <div id="bottom" class="panel">
+    <button id="btn-play" title="space">▶ play</button>
+    <select id="speed" title="playback rate"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+    <input id="scrub" type="range" min="0" max="1" step="0.01" value="0">
+    <div id="timebox"><div class="big" id="tb-time">T+00:00:00</div><div class="sm" id="tb-frame">frame 0 / 0</div></div>
+    <div id="scale"><div class="rule"></div><span id="scale-lab">—</span></div>
+    <div id="keys"><b>space</b> play · <b>← →</b> step · <b>1 2 3</b> cameras · <b>O</b> orbit · <b>R</b> reset · drag to rotate · wheel to zoom</div>
+  </div>
+</div>
+
+<div id="cards"></div>
+
+<div id="load"><div class="box"><div class="name"><i>aqua-sim</i> · HOLO TABLE</div><div class="msg" id="load-msg">loading run…</div><div class="bar"><i id="load-bar"></i></div></div></div>
+
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./holo.js"></script>
+</body>
+</html>
