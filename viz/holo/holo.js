@@ -41,6 +41,7 @@ const RELIEF_TARGET = 0.12;     // terrain relief as a fraction of L (vertical e
 const EXAG_MAX = 120;
 const CONTOUR_LEVELS = 18;
 const MAX_CONTOUR_CELLS = 1_400_000;   // skip per-frame depth outline above this
+const MAX_PRISM_CELLS = 400_000;   // one InstancedMesh; a 10 m Manhattan run closes ~1e5 cells
 const BASE_FPS = 1.5;           // frames per second at 1×
 const COLORS = {
   cy: new THREE.Color('#3fe9ff'), cy2: new THREE.Color('#19a7b8'), am: new THREE.Color('#ffb347'),
@@ -431,7 +432,7 @@ function buildScene(run) {
   // --- obstacles (buildings) as glowing prisms, if any
   if (run.obstacle) {
     const cellsWith = []; for (let k = 0; k < run.obstacle.length; k++) if (run.obstacle[k] > 0 && mask[k] > 0.5) cellsWith.push(k);
-    if (cellsWith.length && cellsWith.length <= 80000) {
+    if (cellsWith.length && cellsWith.length <= MAX_PRISM_CELLS) {
       const box = new THREE.BoxGeometry(scale * 0.9, 1, scale * 0.9);
       const inst = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: COLORS.cy, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }), cellsWith.length);
       const m = new THREE.Matrix4();
