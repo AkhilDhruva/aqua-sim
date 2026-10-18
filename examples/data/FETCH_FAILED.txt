@@ -1,0 +1,30 @@
+NYC building footprints fetch FAILED: host not reachable from this session.
+
+Task: download NYC Open Data "Building Footprints" (dataset id nqwf-w8eh) within
+bbox west -74.025, south 40.695, east -73.955, north 40.775 (WGS84) and commit
+them with provenance. No data was downloaded; nothing under src/ was touched.
+
+Session: https://claude.ai/code/session_014LudjmDAYV5MYd9gUBqMYo
+Attempt times (UTC): 2026-10-18T01:01:53Z and a retry ~10 s later (same result).
+
+Command:
+  curl -sS -o /dev/null -w "%{http_code}\n" "https://data.cityofnewyork.us/api/views/nqwf-w8eh.json"
+
+Exact output (both attempts):
+  curl: (56) CONNECT tunnel failed, response 403
+  000
+
+Agent-proxy status (http://127.0.0.1:37175/__agentproxy/status), recentRelayFailures:
+  {
+    "ts": "2026-10-18T01:01:53.336Z",
+    "kind": "connect_rejected",
+    "detail": "gateway answered 403 to CONNECT (policy denial or upstream failure)",
+    "host": "data.cityofnewyork.us:443"
+  }
+
+Interpretation: the egress gateway refused the CONNECT for data.cityofnewyork.us:443.
+The allowed-domains change for this host did not apply to this session (the proxy
+reports selective=false, i.e. all traffic goes through the policy gateway, and the
+gateway answered 403). Re-run the fetch after the domain allowlist is confirmed to
+include data.cityofnewyork.us (a new session may be needed for the policy to take
+effect).
