@@ -41,6 +41,10 @@ class DEMSource(TerrainSource):
             refinement is a later step).
         max_cells: guard against accidentally building a grid too large for the
             reference pure-Python solver; raises with guidance if exceeded.
+        resampling: rasterio resampling name. ``"bilinear"`` (default) suits
+            tiles near the target resolution; use ``"average"`` when coarsening
+            a much finer DEM (e.g. 1 m LiDAR terrain onto a 4 m solver grid) so
+            each cell carries the mean ground of its footprint, not a sample.
     """
 
     def __init__(
@@ -51,6 +55,7 @@ class DEMSource(TerrainSource):
         target_crs: Optional[str] = None,
         default_manning: float = 0.03,
         max_cells: int = 500_000,
+        resampling: str = "bilinear",
     ) -> None:
         # Multiple paths are mosaicked — each tile is reprojected onto the
         # common target grid and empty cells are filled first-path-wins (order
@@ -64,6 +69,7 @@ class DEMSource(TerrainSource):
         self.target_crs = target_crs
         self.default_manning = default_manning
         self.max_cells = max_cells
+        self.resampling = resampling
 
     @property
     def path(self) -> str:
@@ -140,7 +146,7 @@ class DEMSource(TerrainSource):
                     dst_transform=dst_transform,
                     dst_crs=dst_crs,
                     dst_nodata=float(fill),
-                    resampling=Resampling.bilinear,
+                    resampling=Resampling[self.resampling],
                 )
             take = (dst == fill) & np.isfinite(layer) & (layer != fill)
             dst[take] = layer[take]
@@ -171,4 +177,7 @@ class DEMSource(TerrainSource):
             "aoi_bounds": list(self.aoi_bounds) if self.aoi_bounds else None,
             "note": "reprojected to metric UTM; bare-earth DEM used as flow surface",
         }
+        if self.resampling != "bilinear":
+            # Recorded only when non-default, so existing runs keep their run_id.
+            grid.meta["resampling"] = self.resampling
         return grid

@@ -120,6 +120,14 @@ def main():
     ap.add_argument("--dem", required=True, action="append", help="USGS 3DEP GeoTIFF tile(s); repeat to mosaic")
     ap.add_argument("--buildings", default=None, help="official footprint file (GPKG/SHP/GeoJSON); omit for terrain-only")
     ap.add_argument("--buildings-url", default=None, help="where the footprint file was actually fetched from (recorded as provenance)")
+    ap.add_argument("--lidar-buildings", default=None,
+                    help="LiDAR building massing from examples/build_lidar_buildings.py (GeoJSON[.gz]); "
+                         "alternative to --buildings")
+    ap.add_argument("--target-crs", default=None, help="grid CRS (default: UTM zone of the AOI); "
+                    "EPSG:26918 keeps USGS 1 m tiles in their native CRS")
+    ap.add_argument("--resampling", default="bilinear", help="DEM resampling; 'average' when coarsening 1 m terrain")
+    ap.add_argument("--max-cells", type=int, default=4_000_000)
+    ap.add_argument("--area-name", default="Manhattan, Lower to Midtown")
     ap.add_argument("--bbox", type=float, nargs=4, metavar=("W", "S", "E", "N"), default=DEFAULT_BBOX)
     ap.add_argument("--dx", type=float, default=10.0)
     ap.add_argument("--hours", type=float, default=6.0, help="simulated hours (rain lasts 4 h; the rest is drain-down)")
@@ -136,7 +144,10 @@ def main():
     for t in tiles:
         print(f"[nyc] tile {os.path.basename(t['path'])} covers lon {t['wgs84_bounds'][0]:.4f}..{t['wgs84_bounds'][2]:.4f} "
               f"lat {t['wgs84_bounds'][1]:.4f}..{t['wgs84_bounds'][3]:.4f}", flush=True)
-    grid = DEMSource(a.dem, target_dx_m=a.dx, aoi_bounds=bbox, max_cells=4_000_000).load()
+    if a.buildings and a.lidar_buildings:
+        ap.error("pass --buildings or --lidar-buildings, not both")
+    grid = DEMSource(a.dem, target_dx_m=a.dx, aoi_bounds=bbox, max_cells=a.max_cells,
+                     target_crs=a.target_crs, resampling=a.resampling).load()
     mask = np.asarray(grid.mask, dtype=bool)
     z = np.asarray(grid.z, dtype=float)
     covered = float(mask.mean())
@@ -153,6 +164,12 @@ def main():
         from aqua_sim.ingestion.buildings import BuildingsSource, apply_buildings
         tb = time.time()
         collection = BuildingsSource(a.buildings, transport_url=a.buildings_url).load_for_grid(grid, aoi_bounds=bbox)
+    elif a.lidar_buildings:
+        from aqua_sim.ingestion.buildings import apply_buildings
+        from aqua_sim.ingestion.lidar import read_geojson
+        tb = time.time()
+        collection = read_geojson(a.lidar_buildings, grid)
+    if collection is not None:
         buildings_summary = apply_buildings(grid, collection)
         print(f"[nyc] buildings: {buildings_summary['buildings']} footprints, mode {buildings_summary['mode']}, "
               f"{buildings_summary['closed_cells']} closed cells, mean coverage {buildings_summary['mean_coverage']:.3f} "
@@ -181,11 +198,14 @@ def main():
                         drainage_blockage=a.blockage, hyetograph=IDA_HYETOGRAPH)
     total_s = a.hours * 3600.0
     scale = "street" if grid.dx <= 10.0 else "screening"
-    bld_label = ("official NYC footprints as no-flow walls" if buildings_summary and buildings_summary["closed_cells"]
-                 else "TERRAIN ONLY — no buildings")
+    if buildings_summary and buildings_summary["closed_cells"]:
+        bld_label = ("USGS LiDAR building massing as no-flow walls" if a.lidar_buildings
+                     else "official NYC footprints as no-flow walls")
+    else:
+        bld_label = "TERRAIN ONLY — no buildings"
     config = SimConfig(storm=storm,
                        solver=SolverConfig(cfl=0.7, total_time_s=total_s, output_interval_s=total_s / a.frames),
-                       aoi_name=f"Manhattan, Lower to Midtown — {scale} resolution {grid.dx:g} m — Ida 2021 hyetograph — {bld_label}")
+                       aoi_name=f"{a.area_name} — {scale} resolution {grid.dx:g} m — Ida 2021 hyetograph — {bld_label}")
     sc = Scenario(grid=grid, config=config, nodes=nodes)
 
     print(f"[nyc] solving {a.hours:g} h, {a.frames} frames, {len(nodes)} sensors …", flush=True)
@@ -197,13 +217,20 @@ def main():
 
     if collection is not None:
         from aqua_sim.ingestion.buildings import export_buildings_json, make_presets
-        presets = make_presets(grid, [("Times Square", -73.9870, 40.7553, 900.0), ("Lower Manhattan", -74.0110, 40.7075, 1200.0)])
+        presets = make_presets(grid, [("Times Square", -73.9870, 40.7553, 900.0),
+                                      ("Lower Manhattan", -74.0110, 40.7075, 1200.0),
+                                      ("Wall St canyon", -74.0090, 40.7060, 450.0),
+                                      ("World Trade Center", -74.0130, 40.7115, 600.0),
+                                      ("The Battery", -74.0165, 40.7033, 700.0)])
         export_buildings_json(collection, grid, a.out, presets=presets)
 
     notes = {
         "purpose": "street-scale Manhattan run on real USGS 3DEP terrain with the Ida 2021 hyetograph",
         "buildings": buildings_summary or {"mode": "NONE — TERRAIN ONLY", "note": "no footprint file was supplied; this run is a pipeline rehearsal, not the building-aware result"},
-        "buildings_file": a.buildings, "buildings_sha256": sha256(a.buildings) if a.buildings else None,
+        "buildings_file": a.buildings or a.lidar_buildings,
+        "buildings_sha256": sha256(a.buildings or a.lidar_buildings) if (a.buildings or a.lidar_buildings) else None,
+        "buildings_kind": "lidar_massing" if a.lidar_buildings else ("footprints" if a.buildings else None),
+        "dem_resampling": a.resampling,
         "buildings_transport_url": a.buildings_url,
         "dem": [{"path": p, "sha256": sha256(p)} for p in a.dem],
         "dem_tiles": tiles,
