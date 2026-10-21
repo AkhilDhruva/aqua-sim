@@ -1,0 +1,89 @@
+{
+  "out": "lm_lidar_buildings.geojson.gz",
+  "sha256": "4521de9daa2987b691daec5faf25db33c337c887e237cae362faa0d8a3f21ac3",
+  "ndsm_tif": "lm_lidar_buildings_ndsm.tif",
+  "ndsm_sha256": "c766cedc20c9c05b8455fb126e5653406dc9e53261ac25f77215f9b00891a3d4",
+  "bbox_wgs84": [
+    -74.022,
+    40.698,
+    -73.968,
+    40.742
+  ],
+  "bounds": [
+    582571.7904555311,
+    4505692.9340061415,
+    587188.4390869557,
+    4510629.42029378
+  ],
+  "crs": "EPSG:26918",
+  "parts": 17386,
+  "regions": 1943,
+  "tallest_part_m": 429.52,
+  "provenance": {
+    "name": "USGS 3DEP LiDAR Point Cloud \u2014 New York City (NY_NewYorkCity)",
+    "ept_url": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/NY_NewYorkCity/ept.json",
+    "acquisition": "2013-08 to 2014-04 (point GPS times)",
+    "companion_dtm": "USGS 3DEP 1 m DEM, project NY_CMPG_2013 (same acquisition)",
+    "license": "USGS 3DEP \u2014 public domain",
+    "native_crs": "EPSG:3857 horizontal (EPT reprojection of EPSG:26918), NAVD88 heights (m)",
+    "classification_note": "This survey leaves buildings and vegetation together in class 1 (unclassified); buildings are separated geometrically, see aqua_sim.ingestion.lidar.detect_buildings.",
+    "dem_sha256": {
+      "USGS_one_meter_x58y451_NY_CMPG_2013.tif": "212a8b14b1f2b4976c88f8bcd7f54f6b8d12e202856c89e6ffe49f91173d1aaa",
+      "USGS_one_meter_x58y452_NY_CMPG_2013.tif": "5d7d24e5ed9c5d74c856b3e12cb2c264cbd837645a0edbab279715da34950fb8"
+    },
+    "fetch_manifest_sha256": "f0baf957d1a26298c1b83b17882dfb7de61041f2fa6b394d9c76fd031cd1ee2b",
+    "method": "LiDAR nDSM (max above-ground return - DTM), canopy/vehicle/noise filtered, nested height-band polygons",
+    "raster_res_m": 1.0,
+    "crs": "EPSG:26918",
+    "bounds": [
+      582571.7904555311,
+      4505692.9340061415,
+      587188.4390869557,
+      4510629.42029378
+    ],
+    "points_read": 136330902,
+    "points_used": 48404406,
+    "laz_files": 3359,
+    "dem_paths": [
+      "USGS_one_meter_x58y451_NY_CMPG_2013.tif",
+      "USGS_one_meter_x58y452_NY_CMPG_2013.tif"
+    ],
+    "detection": {
+      "candidates": 6174986,
+      "regions_raw": 3386,
+      "seen_through_cells": 411667,
+      "elevated_corridor_cells": 440647,
+      "dropped_small": 1443,
+      "dropped_over_water": 0,
+      "despeckled_cells": 434107,
+      "regions": 1943,
+      "building_cells": 5921624,
+      "building_area_m2": 5921624.0
+    },
+    "parts": 17386,
+    "parameters": {
+      "band_m": 3.0
+    },
+    "caveat": "buildings as of the survey date (2013-2014)",
+    "elevated_lines": {
+      "file": "elevated_lm.geojson",
+      "sha256": "5cb99882b9d777215123ff5f8d75e6217ea764d2691518a0d147b60df32d02a2",
+      "dataset": "Overture Maps \u2014 transportation/segment",
+      "release": "2026-10-21.0",
+      "url": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=transportation/type=segment/",
+      "license": "ODbL (OpenStreetMap contributors) via Overture Maps Foundation",
+      "bbox_wgs84": [
+        -74.022,
+        40.698,
+        -73.968,
+        40.742
+      ],
+      "segments_scanned": 14868,
+      "fetched_utc": "2026-10-21T22:27:10+00:00",
+      "skipped_closed_footway_loops": 0,
+      "skipped_unnamed_footway_or_service": 188,
+      "rule": "is_bridge or level>=1 (whole or linear-referenced), excluding tunnels/indoor and unnamed footway/service segments"
+    }
+  },
+  "wall_seconds": 322.1
+}

@@ -41,6 +41,8 @@ def main():
     ap.add_argument("--bbox", type=float, nargs=4, metavar=("W", "S", "E", "N"), required=True)
     ap.add_argument("--crs", default="EPSG:26918")
     ap.add_argument("--band-m", type=float, default=3.0)
+    ap.add_argument("--elevated-lines", default=None,
+                    help="WGS84 GeoJSON of bridges/viaducts from fetch_overture_bridges.py")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -55,12 +57,18 @@ def main():
 
     stem = a.out[:-len(".geojson.gz")] if a.out.endswith(".geojson.gz") else os.path.splitext(a.out)[0]
     prov = dict(NYC_LIDAR_DATASET)
+    prov = dict(prov)
     prov["dem_sha256"] = {os.path.basename(p): sha256(p) for p in a.dem}
     if os.path.exists(fetch_manifest):
         prov["fetch_manifest_sha256"] = sha256(fetch_manifest)
     coll = buildings_from_lidar(laz, a.dem, bounds, crs=a.crs, provenance=prov,
                                 raster_out=stem + "_ndsm.tif",
-                                parts_kwargs={"band_m": a.band_m})
+                                parts_kwargs={"band_m": a.band_m},
+                                elevated_lines=a.elevated_lines)
+    if a.elevated_lines:
+        src = json.load(open(a.elevated_lines)).get("source", {})
+        coll.provenance["elevated_lines"] = {"file": os.path.basename(a.elevated_lines),
+                                             "sha256": sha256(a.elevated_lines), **src}
     write_geojson(coll, a.out)
     heights = sorted(b.height_m for b in coll.buildings)
     summary = {

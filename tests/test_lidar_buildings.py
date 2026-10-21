@@ -129,16 +129,45 @@ def test_rasterize_returns_bins_max_and_pulse_counts(tmp_path):
     assert rr.count[0, 1] == 1 and rr.multi[0, 1] == 1
 
 
-def test_bridge_deck_and_superstructure_are_not_walls():
-    """A classified deck with an unclassified truss above it, crossing the
-    scene and touching the podium: no part of it may become a wall."""
+def test_elevated_deck_and_river_span_are_not_walls():
+    """A deck crossing the scene at 20 m, seen through (ground returns under
+    it on land), continuing over hydro-flattened water: no part may become a
+    wall, while the podium's edges stay intact."""
     rr, dtm = scene()
-    bridge = np.zeros_like(rr.count)
-    bridge[70:76, :] = 5                       # 6 m wide deck across the scene
-    rr.zmax[70:76, :] = 5.0 + 20.0             # truss returns above it (class 1)
+    rr.zmax[70:76, :] = 5.0 + 20.0
     rr.count[70:76, :] = 10
-    rr.bridge = bridge
+    low = np.zeros_like(rr.count)
+    low[70:76, :40:2] = 1                      # ground seen under the land half
+    dtm[66:80, 40:] = -1.62                     # river: hydro-flattened surface
+    rr.zmax[70:76, 40:] = -1.62 + 20.0
+    low[8, 8:32] = 1                           # podium's edge row holds street returns
+    rr.low = low
     br = detect_buildings(rr, dtm)
     assert not br.mask[67:79, :].any()
-    assert br.mask[8:32, 8:32].all()           # the real building is untouched
-    assert br.stats["bridge_cells"] == 6 * 80
+    assert br.mask[8:32, 8:32].all()           # the real building, edges included
+    assert br.stats["seen_through_cells"] >= 6 * 30
+
+
+def test_elevated_corridor_mask_buffers_line_by_width(tmp_path):
+    import json
+    from pyproj import Transformer
+    from aqua_sim.ingestion.lidar import elevated_corridor_mask
+
+    tr = Transformer.from_crs("EPSG:26918", "EPSG:4326", always_xy=True)
+    a = tr.transform(LEFT + 10, TOP - 40.5)
+    b = tr.transform(LEFT + 70, TOP - 40.5)
+    doc = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"width_m": 10.0},
+         "geometry": {"type": "LineString", "coordinates": [list(a), list(b)]}}]}
+    p = tmp_path / "el.geojson"
+    p.write_text(json.dumps(doc))
+    m = elevated_corridor_mask(str(p), TF, (80, 80), "EPSG:26918", margin_m=1.0)
+    col = m[:, 40]
+    rows = np.nonzero(col)[0]
+    # 5 m half-width + 1 m margin either side of the line at row ~40.
+    assert 10 <= len(rows) <= 14 and rows.min() >= 33 and rows.max() <= 47
+    assert not m[:, 0].any() and not m[:, 79].any()   # line ends at x=10..70 (+6 m)
+
+    rr, dtm = scene()
+    br = detect_buildings(rr, dtm, elevated=m)
+    assert br.stats["elevated_corridor_cells"] == int(m.sum())

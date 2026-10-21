@@ -18,8 +18,11 @@ Pipeline (all rasters share one north-up metric grid, e.g. the 1 m DEM's):
    opening removes thin structures (cranes, poles, wires), closing and hole
    filling repair roof dropouts, and connected regions smaller than
    ``min_area_m2`` (vehicles, kiosks) or standing over deep water (ships)
-   are discarded. Cells on or within ``bridge_buffer_m`` of a classified
-   bridge deck are never building: water flows under elevated structures.
+   are discarded. Elevated structures are never building, because water
+   flows beneath them: cells on hydro-flattened open water (cuts river
+   spans), cells where the scanner saw the ground through the structure,
+   and, when supplied, mapped bridge/viaduct corridors (low decks that look
+   like low roofs to a LiDAR).
 3. ``building_parts`` — each connected region becomes a set of nested
    *level* polygons: level k covers every cell whose roof is at or above
    height band k, so extruding every level from the ground reproduces the
@@ -58,9 +61,11 @@ NYC_LIDAR_DATASET = {
 
 #: ASPRS classes holding above-ground features in the NYC survey.
 ABOVE_GROUND_CLASSES = (1,)
-#: ASPRS bridge-deck class. Decks, and the trusses and cables above them,
-#: are elevated: water flows beneath, so they must never become walls.
-BRIDGE_CLASSES = (17,)
+#: Classes whose near-ground returns count as "seen through" a structure:
+#: unclassified, ground, water and 17 (in this 2013-14 survey class 17 holds
+#: flight-line overlap points of every surface, roofs and ground alike — it is
+#: NOT bridge deck, and the bridges themselves sit in class 1).
+LOW_RETURN_CLASSES = (1, 2, 9, 17)
 
 
 @dataclass
@@ -74,7 +79,7 @@ class ReturnRasters:
     crs: str
     points_read: int = 0
     points_used: int = 0
-    bridge: "object" = None   # int32, bridge-deck returns per cell (None if not binned)
+    low: "object" = None      # int32, near-ground returns per cell (None without a DTM)
 
 
 @dataclass
@@ -105,9 +110,13 @@ def grid_for_bounds(bounds: Sequence[float], res: float, snap_origin: Sequence[f
 def rasterize_returns(laz_paths: Iterable[str], transform: tuple, shape: tuple,
                       src_crs: str = "EPSG:3857", dst_crs: str = "EPSG:26918",
                       classes: Sequence[int] = ABOVE_GROUND_CLASSES,
-                      bridge_classes: Sequence[int] = BRIDGE_CLASSES) -> ReturnRasters:
-    """Bin the selected classes' returns into a grid: max Z and pulse counts,
-    plus a per-cell count of bridge-deck returns."""
+                      dtm=None, low_classes: Sequence[int] = LOW_RETURN_CLASSES,
+                      low_tol_m: float = 1.0) -> ReturnRasters:
+    """Bin the selected classes' returns into a grid: max Z and pulse counts.
+
+    With ``dtm`` (an array on this grid), also counts per cell the returns of
+    ``low_classes`` lying within ``low_tol_m`` of the ground: the "seen
+    through" signal that marks elevated decks (see ``detect_buildings``)."""
     import laspy
     import numpy as np
     from pyproj import Transformer
@@ -117,47 +126,54 @@ def rasterize_returns(laz_paths: Iterable[str], transform: tuple, shape: tuple,
     zmax = np.full(ny * nx, -np.inf, dtype=np.float64)
     count = np.zeros(ny * nx, dtype=np.int64)
     multi = np.zeros(ny * nx, dtype=np.int64)
-    bridge = np.zeros(ny * nx, dtype=np.int64)
+    low = np.zeros(ny * nx, dtype=np.int64) if dtm is not None else None
+    dflat = np.asarray(dtm, dtype=np.float64).ravel() if dtm is not None else None
+    wanted = tuple(set(classes) | (set(low_classes) if dtm is not None else set()))
     tr = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
     read = used = 0
     for path in laz_paths:
         las = laspy.read(path)
         read += len(las.points)
         cls_all = np.asarray(las.classification)
-        keep = np.isin(cls_all, classes) | np.isin(cls_all, bridge_classes)
+        keep = np.isin(cls_all, wanted)
         if not keep.any():
             continue
         x, y = tr.transform(np.asarray(las.x)[keep], np.asarray(las.y)[keep])
         cls = cls_all[keep]
         z = np.asarray(las.z)[keep]
-        rn = np.asarray(las.return_number)[keep]
-        nr = np.asarray(las.number_of_returns)[keep]
         col = np.floor((x - left) / res).astype(np.int64)
         row = np.floor((top - y) / -neg_res).astype(np.int64)
         inside = (col >= 0) & (col < nx) & (row >= 0) & (row < ny)
         if not inside.any():
             continue
-        is_b = np.isin(cls, bridge_classes)
-        sel = inside & ~is_b
-        bsel = inside & is_b
+        idx_all = row * nx + col
         # In-place scatter-adds: a full-grid bincount per file would allocate
         # ny*nx counters for every one of thousands of small tiles.
-        if bsel.any():
-            np.add.at(bridge, row[bsel] * nx + col[bsel], 1)
+        if low is not None:
+            lsel = inside & np.isin(cls, low_classes)
+            if lsel.any():
+                li = idx_all[lsel]
+                g = dflat[li]
+                near = np.isfinite(g) & (z[lsel] <= g + low_tol_m)
+                if near.any():
+                    np.add.at(low, li[near], 1)
+        sel = inside & np.isin(cls, classes)
         if not sel.any():
             continue
-        idx = row[sel] * nx + col[sel]
+        idx = idx_all[sel]
+        rn = np.asarray(las.return_number)[keep][sel]
+        nr = np.asarray(las.number_of_returns)[keep][sel]
         used += int(sel.sum())
         np.maximum.at(zmax, idx, z[sel])
         np.add.at(count, idx, 1)
-        np.add.at(multi, idx, ((rn < nr) & (nr > 1))[sel].astype(np.int64))
+        np.add.at(multi, idx, ((rn < nr) & (nr > 1)).astype(np.int64))
     zmax[~np.isfinite(zmax)] = np.nan
     return ReturnRasters(zmax=zmax.reshape(ny, nx).astype(np.float32),
                          count=count.reshape(ny, nx).astype(np.int32),
                          multi=multi.reshape(ny, nx).astype(np.int32),
                          transform=tuple(transform), crs=dst_crs,
                          points_read=read, points_used=used,
-                         bridge=bridge.reshape(ny, nx).astype(np.int32))
+                         low=low.reshape(ny, nx).astype(np.int32) if low is not None else None)
 
 
 def read_dtm(dem_paths: Sequence[str], transform: tuple, shape: tuple, crs: str):
@@ -184,7 +200,9 @@ def read_dtm(dem_paths: Sequence[str], transform: tuple, shape: tuple, crs: str)
 def detect_buildings(rr: ReturnRasters, dtm, min_height_m: float = 2.5,
                      max_multi_ratio: float = 0.35, min_area_m2: float = 50.0,
                      max_hole_m2: float = 400.0, min_ground_m: float = -2.0,
-                     spike_tol_m: float = 1.5, bridge_buffer_m: float = 3.0) -> BuildingRasters:
+                     spike_tol_m: float = 1.5, water_dtm_max_m: float = -1.0,
+                     max_seen_through: float = 0.2, seen_window_m: float = 5.0,
+                     elevated=None) -> BuildingRasters:
     """Separate buildings from canopy, vehicles and noise; see module doc."""
     import numpy as np
     from scipy import ndimage as ndi
@@ -201,13 +219,30 @@ def detect_buildings(rr: ReturnRasters, dtm, min_height_m: float = 2.5,
     ratio = np.where(n3 > 0, m3 / np.maximum(n3, 1), 1.0)
     cand = has & (ndsm >= min_height_m) & (ratio < max_multi_ratio)
     s3 = np.ones((3, 3), dtype=bool)
-    near_bridge = None
-    if rr.bridge is not None and (rr.bridge > 0).any():
-        # Bridge decks plus a small buffer: removes the trusses, cables and
-        # towers that the survey left in class 1 above a classified deck.
-        it = max(int(round(bridge_buffer_m / res)), 1)
-        near_bridge = ndi.binary_dilation(rr.bridge > 0, structure=s3, iterations=it)
-        cand &= ~near_bridge
+    # Open water: the DTM is hydro-flattened there, so no building can stand
+    # on it. This cuts every river span of a bridge at the shoreline.
+    blocked = ~np.isfinite(dtm) | (dtm < water_dtm_max_m)
+    # Elevated decks on land (bridge approaches, viaducts): the scanner sees
+    # the ground beneath them at oblique angles, a solid building never does.
+    # Measured over INTERIOR candidate cells only (edge cells of a roof
+    # legitimately hold street returns too), as the share in a window that
+    # hold a near-ground return; flagged deck regions then grow one cell
+    # within the candidates to take their own edges.
+    seen = None
+    if rr.low is not None:
+        w = max(int(round(seen_window_m / res)) | 1, 3)
+        kw = np.ones((w, w))
+        interior = ndi.binary_erosion(cand, structure=np.ones((3, 3), dtype=bool))
+        c_n = ndi.convolve(interior.astype(np.float64), kw, mode="constant")
+        s_n = ndi.convolve((interior & (rr.low > 0)).astype(np.float64), kw, mode="constant")
+        seen = interior & (s_n > max_seen_through * np.maximum(c_n, 1.0))
+        seen = ndi.binary_dilation(seen, structure=np.ones((3, 3), dtype=bool)) & cand
+        blocked |= seen
+    if elevated is not None:
+        # Mapped bridges/viaducts (see elevated_corridor_mask): the low decks
+        # the seen-through test cannot separate from low roofs.
+        blocked |= elevated
+    cand &= ~blocked
     opened = ndi.binary_opening(cand, structure=s3)
     closed = ndi.binary_closing(opened, structure=s3)
     # Fill enclosed holes (roof dropouts, light wells) up to max_hole_m2.
@@ -219,11 +254,11 @@ def detect_buildings(rr: ReturnRasters, dtm, min_height_m: float = 2.5,
         small = np.zeros(nh + 1, dtype=bool)
         small[1:] = sizes <= max_hole_m2
         closed = closed | small[hl]
-    if near_bridge is not None:
-        closed &= ~near_bridge      # closing/hole-filling must not re-bridge a deck
+    closed &= ~blocked              # closing/hole-filling must not re-span a deck
     labels, n = ndi.label(closed, structure=s3)
     stats = {"candidates": int(cand.sum()), "regions_raw": int(n),
-             "bridge_cells": int((rr.bridge > 0).sum()) if rr.bridge is not None else 0}
+             "seen_through_cells": int(seen.sum()) if seen is not None else 0,
+             "elevated_corridor_cells": int(elevated.sum()) if elevated is not None else 0}
     if n:
         idx = np.arange(1, n + 1)
         area = ndi.sum(closed, labels, index=idx) * cell_area
@@ -264,6 +299,39 @@ def detect_buildings(rr: ReturnRasters, dtm, min_height_m: float = 2.5,
     stats.update(regions=int(n), building_cells=int(mask.sum()),
                  building_area_m2=round(float(mask.sum() * cell_area), 1))
     return BuildingRasters(mask=mask, ndsm=h, labels=labels.astype(np.int32), stats=stats)
+
+
+def elevated_corridor_mask(geojson_path: str, transform: tuple, shape: tuple, crs: str,
+                           margin_m: float = 1.5):
+    """Cells within ``width_m / 2 + margin_m`` of any elevated line in a
+    WGS84 GeoJSON (from ``examples/fetch_overture_bridges.py``)."""
+    import json
+
+    import numpy as np
+    from pyproj import Transformer
+    from rasterio import features as rfeatures
+    from rasterio.transform import Affine
+    from scipy import ndimage as ndi
+
+    with open(geojson_path) as f:
+        doc = json.load(f)
+    tr = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    by_width: dict[float, list] = {}
+    for ft in doc.get("features", []):
+        coords = ft["geometry"]["coordinates"]
+        xs, ys = tr.transform([c[0] for c in coords], [c[1] for c in coords])
+        geom = {"type": "LineString", "coordinates": list(zip(xs, ys))}
+        by_width.setdefault(float(ft["properties"].get("width_m") or 8.0), []).append(geom)
+    out = np.zeros(shape, dtype=bool)
+    res = transform[0]
+    for width, geoms in by_width.items():
+        line = rfeatures.rasterize(((g, 1) for g in geoms), out_shape=shape,
+                                   transform=Affine(*transform), dtype="uint8", all_touched=True)
+        if not line.any():
+            continue
+        dist = ndi.distance_transform_edt(line == 0) * res
+        out |= dist <= width / 2.0 + margin_m
+    return out
 
 
 def _simplify_ring(ring, tol: float):
@@ -354,21 +422,25 @@ def buildings_from_lidar(laz_paths: Sequence[str], dem_paths: Sequence[str],
                          provenance: Optional[dict] = None,
                          raster_out: Optional[str] = None,
                          detect_kwargs: Optional[dict] = None,
-                         parts_kwargs: Optional[dict] = None) -> BuildingCollection:
+                         parts_kwargs: Optional[dict] = None,
+                         elevated_lines: Optional[str] = None) -> BuildingCollection:
     """End to end: LAZ tiles + DTM tile(s) -> ``BuildingCollection`` in ``crs``.
 
     ``bounds`` are ``(left, bottom, right, top)`` in ``crs``. The grid snaps to
     the first DEM's pixel origin so building cells coincide with DTM pixels.
     ``raster_out`` (a ``.tif`` path) optionally saves the nDSM for inspection.
+    ``elevated_lines`` (WGS84 GeoJSON of bridges/viaducts) blocks their decks.
     """
     import rasterio
 
     with rasterio.open(dem_paths[0]) as src:
         origin = (src.transform.c, src.transform.f)
     transform, shape = grid_for_bounds(bounds, res, snap_origin=origin)
-    rr = rasterize_returns(laz_paths, transform, shape, src_crs=src_crs, dst_crs=crs)
     dtm = read_dtm(dem_paths, transform, shape, crs)
-    br = detect_buildings(rr, dtm, **(detect_kwargs or {}))
+    rr = rasterize_returns(laz_paths, transform, shape, src_crs=src_crs, dst_crs=crs, dtm=dtm)
+    elevated = (elevated_corridor_mask(elevated_lines, transform, shape, crs)
+                if elevated_lines else None)
+    br = detect_buildings(rr, dtm, elevated=elevated, **(detect_kwargs or {}))
     parts = building_parts(br, transform, **(parts_kwargs or {}))
     if raster_out:
         from rasterio.transform import Affine

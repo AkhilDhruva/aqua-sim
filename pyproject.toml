@@ -15,6 +15,10 @@ dev = ["pytest"]
 # solver, risk, export) runs without these; DEMSource imports them lazily.
 # (Affine transforms come via rasterio.transform; no direct pyproj/affine use.)
 geo = ["numpy>=1.24", "rasterio>=1.3"]
+# LiDAR building massing (ingestion/lidar.py) and its example scripts.
+lidar = ["numpy>=1.24", "rasterio>=1.3", "scipy>=1.10", "pyproj>=3.5", "laspy[lazrs]>=2.4"]
+# Overture bridge/viaduct extraction (examples/fetch_overture_bridges.py).
+overture = ["pyarrow>=14", "shapely>=2.0"]
 
 [project.scripts]
 aqua-sim = "aqua_sim.main:main"
