@@ -28,3 +28,7 @@ output/
 viz/ida_run/
 viz/nyc_run/
 viz/lm_run/
+viz/ny_run/
+viz/metro60_run/
+viz/nyc_street_run
+viz/nyc_street_*

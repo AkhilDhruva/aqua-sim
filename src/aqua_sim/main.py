@@ -44,17 +44,27 @@ def _self_check() -> int:
     return 0
 
 
-def _run(out_dir: str, dem_path: str | None = None) -> int:
-    from aqua_sim.scenario import (build_manhattan_demo,
+def _run(out_dir: str, dem_paths: list[str] | None = None,
+         area: str | None = None, dx: float | None = None,
+         buildings: str | None = None) -> int:
+    from aqua_sim.scenario import (build_area_scenario, build_manhattan_demo,
                                    build_scenario_from_dem, run_scenario)
 
-    if dem_path:
-        print(f"aqua-sim v{__version__} — running scenario from DEM: {dem_path}")
-        sc = build_scenario_from_dem(dem_path)
+    if area:
+        if not dem_paths:
+            print("error: --area requires at least one --dem tile", file=sys.stderr)
+            return 2
+        print(f"aqua-sim v{__version__} — area '{area}' from {len(dem_paths)} DEM tile(s)")
+        sc = build_area_scenario(area, dem_paths, target_dx_m=dx,
+                                 buildings_path=buildings)
+    elif dem_paths:
+        print(f"aqua-sim v{__version__} — running scenario from DEM: {dem_paths[0]}")
+        sc = build_scenario_from_dem(dem_paths[0])
     else:
         print(f"aqua-sim v{__version__} — running Manhattan demo scenario (synthetic)...")
         sc = build_manhattan_demo()
     manifest = run_scenario(sc, out_dir)
+    print(f"  aoi: {manifest['aoi']}")
     print(f"  grid: {sc.grid.nx}x{sc.grid.ny} @ {sc.grid.dx} m  [{sc.grid.crs}]")
     print(f"  frames: {manifest['frame_count']}  peak depth: {manifest['peak_depth_m']} m")
     print(f"  run_id: {manifest['run_id']}")
@@ -72,15 +82,26 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="run a scenario and export frames")
     run_p.add_argument("outdir", nargs="?", default="output/manhattan_run",
                        help="run folder to write (default: output/manhattan_run)")
-    run_p.add_argument("--dem", metavar="PATH", default=None,
-                       help="GeoTIFF DEM to simulate on (omit for the synthetic demo)")
+    run_p.add_argument("--dem", metavar="PATH", action="append", default=None,
+                       help="GeoTIFF DEM tile; repeat to mosaic several "
+                            "(omit for the synthetic demo)")
+    from aqua_sim.scenario import AREAS
+    run_p.add_argument("--area", choices=sorted(AREAS), default=None,
+                       help="named region to clip to (requires --dem): "
+                            + ", ".join(f"{k} (default {v['dx']:.0f} m)"
+                                        for k, v in sorted(AREAS.items())))
+    run_p.add_argument("--dx", type=float, default=None, metavar="M",
+                       help="cell size in meters (overrides the area default)")
+    run_p.add_argument("--buildings", metavar="PATH", default=None,
+                       help="official building-footprint file (GPKG/SHP/GeoJSON)")
 
     ns = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if ns.command == "run":
         # argparse errors out loudly on `--dem` with a missing value and accepts
         # `--dem=path` — a forgotten path can no longer silently substitute the
         # synthetic demo for a real-DEM run.
-        return _run(ns.outdir, dem_path=ns.dem)
+        return _run(ns.outdir, dem_paths=ns.dem, area=ns.area, dx=ns.dx,
+                    buildings=ns.buildings)
     return _self_check()
 
 

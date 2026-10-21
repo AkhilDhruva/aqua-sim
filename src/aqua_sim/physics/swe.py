@@ -44,6 +44,10 @@ from aqua_sim.physics.stability import cfl_timestep
 #: against this so run provenance can never record a scheme that did not run.
 SUPPORTED_SCHEMES = ("local_inertial",)
 
+#: Sentinel "no barrier" crest — never wins a max(), so max(za, zb, NO_CREST)
+#: is bit-identical to max(za, zb). Lets crests be passed unconditionally.
+NO_CREST = float("-inf")
+
 
 @dataclass
 class FlowState:
@@ -100,6 +104,19 @@ class ShallowWaterSolver:
         self._max_face_v = 0.0   # peak face velocity, tracked by _face_flux()
         self.time_s = 0.0
 
+        # --- Phase 6A conditioned-surface inputs (all optional) --------------
+        self._crest_x = grid.crest_x        # ny x (nx+1) face crests, or None
+        self._crest_y = grid.crest_y        # (ny+1) x nx face crests, or None
+        self._infil_rate = grid.infiltration_rate
+        self._infil_cap = grid.infiltration_capacity
+        self._drainage = grid.drainage
+        self._connections = grid.connections or []
+        # Per-cell sink path (infiltration or inlet drainage) — only taken when
+        # conditioning is present, so a bare-DTM run stays bit-identical.
+        self._per_cell_sink = (self._infil_rate is not None
+                               or self._drainage is not None)
+        self._cum_infil = (zeros(ny, nx) if self._infil_rate is not None else None)
+
     # -- setup ---------------------------------------------------------------
 
     def set_initial_depth(self, depth: Matrix) -> None:
@@ -120,9 +137,11 @@ class ShallowWaterSolver:
 
     # -- one timestep --------------------------------------------------------
 
-    def _face_flux(self, za, ha, zb, hb, q_prev, n, dt) -> float:
+    def _face_flux(self, za, ha, zb, hb, q_prev, n, dt, crest=NO_CREST) -> float:
         eta_a, eta_b = za + ha, zb + hb
-        hflow = max(eta_a, eta_b) - max(za, zb)
+        # A subgrid barrier (curb/median/retaining wall) raises the controlling
+        # bed at this face: flow only once the water surface tops the crest.
+        hflow = max(eta_a, eta_b) - max(za, zb, crest)
         if hflow <= self.config.solver.min_depth:
             return 0.0
         slope = (eta_b - eta_a) / self.grid.dx
@@ -147,6 +166,7 @@ class ShallowWaterSolver:
         # two domain-edge faces of each row honor the OPEN/CLOSED boundary.
         for y in range(ny):
             wy, zy, my, hy, qxy = wall[y], z[y], man[y], h[y], self.qx[y]
+            cxy = self._crest_x[y] if self._crest_x is not None else None
             for i in range(nx + 1):
                 left, right = i - 1, i
                 a_edge, b_edge = left < 0, right >= nx
@@ -173,13 +193,15 @@ class ShallowWaterSolver:
                     za, ha = zy[left], hy[left]
                     zb, hb = zy[right], hy[right]
                     n = 0.5 * (my[left] + my[right])
-                qxy[i] = self._face_flux(za, ha, zb, hb, qxy[i], n, dt)
+                crest = cxy[i] if cxy is not None else NO_CREST
+                qxy[i] = self._face_flux(za, ha, zb, hb, qxy[i], n, dt, crest)
 
         # y-direction fluxes (same wall/boundary rules).
         for j in range(ny + 1):
             up, down = j - 1, j
             a_edge, b_edge = up < 0, down >= ny
             qyj = self.qy[j]
+            cyj = self._crest_y[j] if self._crest_y is not None else None
             for x in range(nx):
                 a_blk = a_edge or wall[up][x]
                 b_blk = b_edge or wall[down][x]
@@ -202,7 +224,8 @@ class ShallowWaterSolver:
                     za, ha = z[up][x], h[up][x]
                     zb, hb = z[down][x], h[down][x]
                     n = 0.5 * (man[up][x] + man[down][x])
-                qyj[x] = self._face_flux(za, ha, zb, hb, qyj[x], n, dt)
+                crest = cyj[x] if cyj is not None else NO_CREST
+                qyj[x] = self._face_flux(za, ha, zb, hb, qyj[x], n, dt, crest)
 
         # Flux limiter: cap each cell's total outflow at the water it holds so
         # depths never go negative. This keeps the scheme mass-conserving (each
@@ -243,37 +266,106 @@ class ShallowWaterSolver:
         # Depth update by mass balance + source term (non-negative by
         # construction). Peak depth is tracked here so the CFL bound needs no
         # extra grid pass.
-        source = self._source_rate()
         inv_dx = 1.0 / dx
         max_h = 0.0
-        for y in range(ny):
-            wy, hy = wall[y], h[y]
-            qx0, qy0, qy1 = self.qx[y], self.qy[y], self.qy[y + 1]
-            for x in range(nx):
-                if wy[x]:
-                    hy[x] = 0.0
-                    continue
-                net = (qx0[x] - qx0[x + 1] + qy0[x] - qy1[x]) * inv_dx
-                new_h = hy[x] + (net + source) * dt
-                if new_h > 0.0:
-                    hy[x] = new_h
-                    if new_h > max_h:
-                        max_h = new_h
+        if not self._per_cell_sink:
+            # Original path (bare DTM): uniform rain minus scalar drainage.
+            source = self._source_rate()
+            for y in range(ny):
+                wy, hy = wall[y], h[y]
+                qx0, qy0, qy1 = self.qx[y], self.qy[y], self.qy[y + 1]
+                for x in range(nx):
+                    if wy[x]:
+                        hy[x] = 0.0
+                        continue
+                    net = (qx0[x] - qx0[x + 1] + qy0[x] - qy1[x]) * inv_dx
+                    new_h = hy[x] + (net + source) * dt
+                    if new_h > 0.0:
+                        hy[x] = new_h
+                        if new_h > max_h:
+                            max_h = new_h
+                    else:
+                        hy[x] = 0.0
+        else:
+            # Conditioned path: uniform rain in, then per-cell infiltration
+            # (rate-limited, capped by remaining capacity), then per-cell inlet
+            # drainage (falls back to the scalar storm drainage where absent).
+            rain = self.config.storm.rainfall_at(self.time_s)
+            scalar_drain = self.config.storm.effective_drainage_m_per_s()
+            irate, icap, cum = self._infil_rate, self._infil_cap, self._cum_infil
+            drain = self._drainage
+            for y in range(ny):
+                wy, hy = wall[y], h[y]
+                qx0, qy0, qy1 = self.qx[y], self.qy[y], self.qy[y + 1]
+                for x in range(nx):
+                    if wy[x]:
+                        hy[x] = 0.0
+                        continue
+                    net = (qx0[x] - qx0[x + 1] + qy0[x] - qy1[x]) * inv_dx
+                    avail = hy[x] + (net + rain) * dt
+                    if avail < 0.0:
+                        avail = 0.0
+                    if irate is not None:
+                        cap_left = (icap[y][x] - cum[y][x]) if icap is not None else 1e18
+                        if cap_left < 0.0:
+                            cap_left = 0.0
+                        inf = irate[y][x] * dt
+                        if inf > cap_left:
+                            inf = cap_left
+                        if inf > avail:
+                            inf = avail
+                        avail -= inf
+                        cum[y][x] += inf
+                    d_rate = drain[y][x] if drain is not None else scalar_drain
+                    drn = d_rate * dt
+                    if drn > avail:
+                        drn = avail
+                    new_h = avail - drn
+                    if new_h > 0.0:
+                        hy[x] = new_h
+                        if new_h > max_h:
+                            max_h = new_h
+                    else:
+                        hy[x] = 0.0
+
+        # Bridge/culvert conduits: move water between linked cells by head, so a
+        # barrier/embankment with a culvert passes flow instead of false-damming.
+        if self._connections:
+            area = self.grid.cell_area_m2()
+            md = self.config.solver.min_depth
+            for (x1, y1, x2, y2, cd_area) in self._connections:
+                eta1 = z[y1][x1] + h[y1][x1]
+                eta2 = z[y2][x2] + h[y2][x2]
+                dh = eta1 - eta2
+                if dh > md:
+                    dx1, dy1, dx2, dy2 = x1, y1, x2, y2  # donor is cell 1
+                elif dh < -md:
+                    dx1, dy1, dx2, dy2 = x2, y2, x1, y1  # donor is cell 2
+                    dh = -dh
                 else:
-                    hy[x] = 0.0
+                    continue
+                vol = cd_area * (2.0 * self.g * dh) ** 0.5 * dt   # orifice Q·dt
+                avail_vol = h[dy1][dx1] * area
+                if vol > avail_vol:
+                    vol = avail_vol
+                ddepth = vol / area
+                h[dy1][dx1] -= ddepth
+                h[dy2][dx2] += ddepth
+                if h[dy2][dx2] > max_h:
+                    max_h = h[dy2][dx2]
 
         self._max_h = max_h
         self.time_s += dt
 
     # -- driving loop --------------------------------------------------------
 
-    def _face_speed(self, q: float, za: float, ha: float, zb: float, hb: float) -> float:
+    def _face_speed(self, q, za, ha, zb, hb, crest=NO_CREST) -> float:
         """Flow speed carried by a face: |q| / hflow, with hflow the depth that
         actually conveys the flux (Bates et al. 2010). Referencing the face's
         own conveyance depth — not the receiving cell's — keeps reported speeds
         physical at wetting fronts, where dividing by a near-zero cell depth
-        would explode."""
-        hflow = max(za + ha, zb + hb) - max(za, zb)
+        would explode. A crest raises the controlling bed (subgrid barrier)."""
+        hflow = max(za + ha, zb + hb) - max(za, zb, crest)
         if hflow <= self.config.solver.min_depth:
             return 0.0
         return abs(q) / hflow
@@ -296,16 +388,22 @@ class ShallowWaterSolver:
                 total += hv * area
                 if hv > md:
                     # Cell speed = fastest of its four faces, each referenced to
-                    # that face's conveyance depth.
+                    # that face's conveyance depth (crest-aware).
+                    cx = self._crest_x
+                    cy = self._crest_y
                     s = 0.0
                     if x > 0:
-                        s = max(s, self._face_speed(self.qx[y][x], zy[x - 1], hy[x - 1], zy[x], hv))
+                        cr = cx[y][x] if cx is not None else NO_CREST
+                        s = max(s, self._face_speed(self.qx[y][x], zy[x - 1], hy[x - 1], zy[x], hv, cr))
                     if x < nx - 1:
-                        s = max(s, self._face_speed(self.qx[y][x + 1], zy[x], hv, zy[x + 1], hy[x + 1]))
+                        cr = cx[y][x + 1] if cx is not None else NO_CREST
+                        s = max(s, self._face_speed(self.qx[y][x + 1], zy[x], hv, zy[x + 1], hy[x + 1], cr))
                     if y > 0:
-                        s = max(s, self._face_speed(self.qy[y][x], z[y - 1][x], h[y - 1][x], zy[x], hv))
+                        cr = cy[y][x] if cy is not None else NO_CREST
+                        s = max(s, self._face_speed(self.qy[y][x], z[y - 1][x], h[y - 1][x], zy[x], hv, cr))
                     if y < ny - 1:
-                        s = max(s, self._face_speed(self.qy[y + 1][x], zy[x], hv, z[y + 1][x], h[y + 1][x]))
+                        cr = cy[y + 1][x] if cy is not None else NO_CREST
+                        s = max(s, self._face_speed(self.qy[y + 1][x], zy[x], hv, z[y + 1][x], h[y + 1][x], cr))
                     speed[y][x] = s
                     if s > max_speed:
                         max_speed = s

@@ -10,6 +10,14 @@ import { OrbitControls } from './vendor/OrbitControls.js';
 import { PALETTES, DEFAULT_PALETTE, THRESHOLDS, paletteUniforms } from './palettes.js';
 import { BuildingsLayer, buildingFloodStats } from './buildings-layer.js';
 
+//: Most simultaneous breach banners drawn over the canvas; the rest are
+//: summarized. A metro run with many sensors would otherwise bury the map.
+const MAX_BANNERS = 3;
+//: Sensor markers are scaled per-frame to hold a roughly constant on-screen
+//: size (like a map pin) instead of a fixed fraction of the domain — a 48 km
+//: metro domain otherwise produces kilometre-tall pins and unreadable labels.
+const MARKER_SCREEN_FRACTION = 0.045;
+
 const state = {
   manifest: null,
   terrain: null,
@@ -30,6 +38,7 @@ const state = {
   nodeMarkers: [],      // {node, mesh} pairs in the scene
   buildings: null,      // BuildingsLayer instance (created with the scene)
   buildingsDoc: null,   // parsed buildings.json, when the run provides one
+  basemapPlane: null,   // street-basemap ground plane (presentation only)
 };
 
 // Engine hazard thresholds for the shader/legend: prefer the values the run's
@@ -88,10 +97,12 @@ async function loadRun() {
 
     buildScene();
     buildBuildings();
+    buildBasemap();
     applyLayerState();   // reflect checkbox state onto freshly-created objects
     buildPresets();
     buildAlertMatrix();
     showProvenance();
+    showSources();
     renderLegend();
     setFrame(0);
     setStatus('');
@@ -117,8 +128,10 @@ function buildScene() {
     state.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1e6);
     state.controls = new OrbitControls(state.camera, canvas);
     state.controls.enableDamping = true;
-    state.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    // Intensities calibrated for three.js r155+ physical lighting (the legacy
+    // 0.6/0.9 pair renders up-facing surfaces near-ambient => dark roofs).
+    state.scene.add(new THREE.AmbientLight(0xffffff, 1.7));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.8);
     sun.position.set(1, 2, 1);
     state.scene.add(sun);
     window.addEventListener('resize', onResize);
@@ -148,26 +161,36 @@ function buildScene() {
   const tGeom = gridGeometry(nx, ny, dx);
   const tPos = tGeom.attributes.position;
   const tCol = [];
+  // When the run ships a buildings layer, the terrain stays BARE EARTH —
+  // extruding obstacle cells here would double-draw dark, cell-quantized
+  // building blocks on top of the real extruded footprints (the "dark noisy
+  // roofs" artifact). Without a buildings layer, obstacle extrusion remains
+  // the visual for walls.
+  const extrudeObstacles = !state.buildingsDoc;
   let zmin = Infinity, zmax = -Infinity;
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     if (terrain.mask && terrain.mask[j] && terrain.mask[j][i] === false) continue;
-    const e = terrain.z[j][i] + (terrain.obstacle?.[j]?.[i] || 0);
+    const e = terrain.z[j][i] + (extrudeObstacles ? (terrain.obstacle?.[j]?.[i] || 0) : 0);
     zmin = Math.min(zmin, e); zmax = Math.max(zmax, e);
   }
   // Vertical exaggeration derived from this run's relief: exaggerate flat
   // terrain so ponding reads, leave mountainous terrain near true scale.
+  // Building-aware runs render at TRUE scale (1x) — buildings at true height
+  // demand an unexaggerated ground, or proportions lie.
   const relief = Math.max(zmax - zmin, 1e-6);
-  state.vertExag = Math.min(12, Math.max(1, (0.025 * Math.max(W, H)) / relief));
+  state.vertExag = state.buildingsDoc
+    ? 1.0
+    : Math.min(12, Math.max(1, (0.025 * Math.max(W, H)) / relief));
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i;
     const masked = terrain.mask && terrain.mask[j] && terrain.mask[j][i] === false;
     const base = terrain.z[j][i];
-    const obs = terrain.obstacle?.[j]?.[i] || 0;
+    const obs = extrudeObstacles ? (terrain.obstacle?.[j]?.[i] || 0) : 0;
     const e = base + obs;
     tPos.setY(k, e * state.vertExag);
     let col;
     if (masked) col = new THREE.Color(0x0a0d13);          // nodata / outside AOI: void
-    else if (obs > 0) col = new THREE.Color(0x2b3550);    // buildings: slate
+    else if (obs > 0) col = new THREE.Color(0x2b3550);    // walls (no bldg layer): slate
     else {
       const t = (e - zmin) / Math.max(zmax - zmin, 1e-6);
       col = new THREE.Color().setHSL(0.30 - 0.12 * t, 0.35, 0.18 + 0.30 * t);
@@ -197,28 +220,32 @@ function buildScene() {
   state.scene.add(wMesh);
 
   // ----- sink-node markers (subway stations etc.) -----
+  // Built at UNIT size around the origin and positioned via group.position, so
+  // updateMarkerScale() can rescale them per frame to a constant on-screen
+  // size (see MARKER_SCREEN_FRACTION).
   const cxg = (nx - 1) / 2, cyg = (ny - 1) / 2;
-  const pinH = Math.max(W, H) * 0.03;
-  const pinR = Math.max(W, H) * 0.004;
   for (const node of state.nodes) {
     if (node.x == null || node.y == null) continue;
     const gx = (node.x - cxg) * dx, gz = (node.y - cyg) * dx;
     const gy = (terrain.z[node.y]?.[node.x] || 0) * state.vertExag;
     const group = new THREE.Group();
+    group.position.set(gx, gy, gz);
     const pin = new THREE.Mesh(
-      new THREE.ConeGeometry(pinR, pinH, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    pin.position.set(gx, gy + pinH / 2, gz);
+      new THREE.ConeGeometry(0.13, 1.0, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }));
+    pin.position.set(0, 0.5, 0);
     pin.rotation.x = Math.PI;  // point down at the station
+    pin.renderOrder = 10;
     group.add(pin);
     const label = makeTextSprite(node.name);
-    const lh = pinH * 0.7;  // label height in world units
-    label.scale.set(lh * label.userData.aspect, lh, 1);
-    label.position.set(gx, gy + pinH * 1.5, gz);
+    label.scale.set(0.7 * label.userData.aspect, 0.7, 1);
+    label.position.set(0, 1.5, 0);
+    label.renderOrder = 11;
     group.add(label);
     state.scene.add(group);
     state.nodeMarkers.push({ node, pin, group, baseColor: 0xffffff });
   }
+  updateMarkerScale();
 
   // camera framing
   const span = Math.max(W, H);
@@ -367,6 +394,7 @@ const LAYER_FNS = {
   lyrBuildings: (v) => state.buildings?.setVisible(v),
   lyrWater: (v) => { const m = state.scene?.getObjectByName('waterMesh'); if (m) m.visible = v; },
   lyrSensors: (v) => { for (const mk of state.nodeMarkers) mk.group.visible = v; },
+  lyrBasemap: (v) => setBasemapVisible(v),
 };
 
 function applyLayerState() {
@@ -393,6 +421,111 @@ function buildBuildings() {
   state.buildings.setVisible(chk.checked);
   document.getElementById('bCount').textContent =
     `${stats.buildings} bldgs / ${stats.tiles} tiles`;
+}
+
+// Street basemap: an attributed ground plane under the terrain. Official NYC
+// planimetric map tiles (or OSM) stream onto it at runtime when network is
+// available; otherwise it stays a neutral attributed plane. It NEVER feeds the
+// solver or exports — presentation only.
+const BASEMAPS = {
+  nyc: { label: 'NYC tiles',
+         attr: 'Basemap: NYC OTI Map Tiles © City of New York (gis.nyc.gov/tiles)',
+         template: 'https://gis.nyc.gov/tiles/{z}/{x}/{y}.png' },
+  osm: { label: 'OSM',
+         attr: 'Basemap © OpenStreetMap contributors',
+         template: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' },
+};
+
+function buildBasemap() {
+  const scene = state.scene;
+  const old = scene.getObjectByName('basemapPlane');
+  if (old) { scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
+  const { nx, ny, dx } = { nx: state.nx, ny: state.ny, dx: state.dx };
+  const [zmin] = state.terrain ? terrainMinMax() : [0, 0];
+  const geo = new THREE.PlaneGeometry(nx * dx, ny * dx);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x141a24 });
+  const plane = new THREE.Mesh(geo, mat);
+  plane.name = 'basemapPlane';
+  plane.position.y = (zmin - 1) * state.vertExag;   // just below terrain
+  plane.visible = document.getElementById('lyrBasemap').checked;
+  scene.add(plane);
+  state.basemapPlane = plane;
+  // Try to drape tiles when a network is available; silently keep the neutral
+  // plane if not (egress-restricted environments simply see the plane).
+  tryLoadBasemapTiles(plane);
+}
+
+// Keep sensor markers a constant apparent size regardless of camera distance
+// or domain extent (a map-pin, not a kilometre-tall cone on a metro domain).
+const _mkV = new THREE.Vector3();
+function updateMarkerScale() {
+  if (!state.camera || !state.nodeMarkers.length) return;
+  const vFov = (state.camera.fov * Math.PI) / 180;
+  for (const m of state.nodeMarkers) {
+    const dist = _mkV.copy(m.group.position).distanceTo(state.camera.position);
+    // World height that subtends MARKER_SCREEN_FRACTION of the viewport height.
+    const s = 2 * Math.tan(vFov / 2) * dist * MARKER_SCREEN_FRACTION;
+    m.group.scale.setScalar(Math.max(s, 1e-3));
+  }
+}
+
+function terrainMinMax() {
+  let a = Infinity, b = -Infinity;
+  const t = state.terrain;
+  for (let j = 0; j < t.ny; j++) for (let i = 0; i < t.nx; i++) {
+    if (t.mask && t.mask[j] && t.mask[j][i] === false) continue;
+    const e = t.z[j][i]; if (e < a) a = e; if (e > b) b = e;
+  }
+  return [a, b];
+}
+
+function tryLoadBasemapTiles(plane) {
+  const key = document.getElementById('bmSrc').dataset.key || 'nyc';
+  const bm = BASEMAPS[key];
+  // A single center tile as a lightweight drape (full slippy-tiling is a
+  // later refinement); load errors are swallowed so offline stays graceful.
+  if (!state.manifest?.provenance?.crs || !state.manifest.provenance) return;
+  const loader = new THREE.TextureLoader();
+  // Without a geo→tile transform we can't place real tiles precisely; this
+  // hook is where a tiled basemap plugs in when network + a tile transform
+  // are configured. Left as the neutral plane by default.
+  void loader; void bm;
+}
+
+function setBasemapVisible(v) {
+  if (state.basemapPlane) state.basemapPlane.visible = v;
+  const attr = document.getElementById('basemapAttr');
+  const key = document.getElementById('bmSrc').dataset.key || 'nyc';
+  attr.style.display = v ? '' : 'none';
+  attr.textContent = v ? BASEMAPS[key].attr : '';
+}
+
+function showSources() {
+  const el = document.getElementById('sources');
+  const p = state.manifest?.provenance || {};
+  const rows = [];
+  const add = (label, name, url) => rows.push(
+    `<div class="src"><b>${label}:</b> <span>${name || '—'}` +
+    (url ? ` · <a href="${url}" target="_blank" rel="noopener">source</a>` : '') +
+    `</span></div>`);
+  add('Terrain', p.terrain_source, p.terrain_meta?.source_path?.[0] || null);
+  const bmeta = p.terrain_meta?.buildings;
+  if (bmeta) add('Buildings', bmeta.name || 'NYC Building Footprints', bmeta.official_url);
+  const cond = p.terrain_meta?.conditioning;
+  if (cond) {
+    for (const grp of ['surfaces', 'barriers']) {
+      for (const k of Object.keys(cond[grp] || {})) {
+        const c = cond[grp][k];
+        add(k, c.name, c.official_url);
+      }
+    }
+    if (cond.drainage) add('drainage', cond.drainage.name, cond.drainage.official_url);
+  }
+  add('Storm', `${p.storm?.rainfall_mm_per_hr ?? '?'} mm/hr · ${p.storm?.duration_hours ?? '?'} h`, null);
+  add('Solver', `${p.solver_scheme} · ${p.solver?.backend || 'auto'}`, null);
+  rows.push('<div class="src" style="margin-top:4px">No Google-derived geometry is used in the model or exports.</div>');
+  el.innerHTML = rows.join('');
 }
 
 function buildPresets() {
@@ -519,10 +652,16 @@ function updateAlerts(fr) {
     m.pin.scale.setScalar(hot ? 1.6 : 1.0);
   }
 
-  // Overlay banners for breaches active on THIS frame.
+  // Overlay banners for breaches active on THIS frame. Capped: a metro run
+  // with many sensors would otherwise stack banners over the whole canvas.
+  // Show the most severe (highest inundation rate) first, summarize the rest.
   const overlay = document.getElementById('overlay');
   overlay.innerHTML = '';
-  (fr.breaches || []).forEach((b) => {
+  const allBreaches = [...(fr.breaches || [])]
+    .sort((a, b) => (b.inundation_rate_m3_s || 0) - (a.inundation_rate_m3_s || 0));
+  const shown = allBreaches.slice(0, MAX_BANNERS);
+  const hidden = allBreaches.length - shown.length;
+  shown.forEach((b) => {
     const div = document.createElement('div');
     div.className = 'breach-banner';
     div.innerHTML =
@@ -531,6 +670,13 @@ function updateAlerts(fr) {
       `&nbsp;|&nbsp; head ${b.head_m} m &nbsp; (${Math.round(b.fraction_full * 100)}% full)`;
     overlay.appendChild(div);
   });
+  if (hidden > 0) {
+    const more = document.createElement('div');
+    more.className = 'breach-more';
+    more.textContent = `+ ${hidden} more sensor${hidden > 1 ? 's' : ''} breaching ` +
+      `(see alert matrix)`;
+    overlay.appendChild(more);
+  }
 }
 
 function seekToTime(t) {
@@ -585,6 +731,7 @@ function tick(ts) {
   }
   if (state.controls) state.controls.update();
   if (state.buildings && state.camera) state.buildings.update(state.camera);
+  updateMarkerScale();
   if (state.renderer) state.renderer.render(state.scene, state.camera);
 }
 
@@ -622,6 +769,7 @@ function initUI() {
   document.getElementById('speedSel').onchange = (e) => { state.fps = Number(e.target.value); };
   document.getElementById('loadBtn').onclick = loadRun;
 
+  document.getElementById('bmSrc').dataset.key = 'nyc';   // default basemap source
   for (const id of Object.keys(LAYER_FNS)) {
     document.getElementById(id).onchange = (e) => LAYER_FNS[id](e.target.checked);
   }

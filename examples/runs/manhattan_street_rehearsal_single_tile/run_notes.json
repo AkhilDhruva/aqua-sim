@@ -1,0 +1,89 @@
+{
+  "purpose": "street-scale Manhattan run on real USGS 3DEP terrain with the Ida 2021 hyetograph",
+  "buildings": {
+    "mode": "NONE \u2014 TERRAIN ONLY",
+    "note": "no footprint file was supplied; this run is a pipeline rehearsal, not the building-aware result"
+  },
+  "buildings_file": null,
+  "buildings_sha256": null,
+  "buildings_transport_url": null,
+  "dem": [
+    {
+      "path": "/tmp/claude-0/-home-user-aqua-sim/3501f8ed-2621-5156-b327-4da2a46d8730/scratchpad/nyc_data/dem/USGS_13_n41w074.tif",
+      "sha256": "76c761bf69ddea7e48805139cc6bc139df1e65e41aa66f4de19c7bb124fa2050"
+    }
+  ],
+  "bbox_wgs84": [
+    -74.025,
+    40.695,
+    -73.955,
+    40.775
+  ],
+  "dx_m": 10.0,
+  "grid": [
+    424,
+    895
+  ],
+  "crs": "EPSG:32618",
+  "storm": {
+    "hyetograph_hr_mmph": [
+      [
+        0.0,
+        20.0
+      ],
+      [
+        1.0,
+        80.0
+      ],
+      [
+        2.0,
+        40.0
+      ],
+      [
+        3.0,
+        20.0
+      ]
+    ],
+    "duration_h": 4.0,
+    "drainage_capacity_mm_hr": 44.0,
+    "blockage": 0.5
+  },
+  "sensors": [
+    {
+      "name": "28 St (1)",
+      "x": 102,
+      "y": 305
+    },
+    {
+      "name": "Times Sq-42 St",
+      "x": 135,
+      "y": 211
+    },
+    {
+      "name": "Low Point 1",
+      "x": 31,
+      "y": 247
+    },
+    {
+      "name": "Low Point 2",
+      "x": 45,
+      "y": 755
+    },
+    {
+      "name": "Low Point 3",
+      "x": 44,
+      "y": 110
+    },
+    {
+      "name": "Low Point 4",
+      "x": 84,
+      "y": 0
+    }
+  ],
+  "sim_hours": 6.0,
+  "frames": 24,
+  "run_id": "08d2d7746f7c84f2",
+  "peak_depth_m": 13.6556,
+  "wall_seconds_solve": 888.1,
+  "wall_seconds_total": 890.1
+}

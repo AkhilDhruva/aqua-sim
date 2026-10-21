@@ -5,6 +5,52 @@ simulator: all physics runs offline in the Python engine, which exports a run
 folder (`manifest.json`, `terrain.json`, `frame_NNN.json`, `alerts.json`). The
 viewer loads the static terrain once, then cycles the frames.
 
+There are two front-ends over the same run folder:
+
+- `viz/` — the **dashboard** (this document): solid terrain, kinetic water
+  shader, alert matrix, breach banners, building layer.
+- `viz/holo/` — the **holo table**: the same run drawn as a volumetric tactical
+  display. See [Holo table](#holo-table) below.
+
+## Holo table
+
+`viz/holo/index.html?run=../sample_run` renders a run the way a command-room
+holotable would: a dark glass slab with a scan grid, the terrain as glowing
+elevation contours (marching squares, brighter toward the ridges), the water as
+a luminous surface whose colour is the engine's danger rating and whose streaks
+advect down the water-surface gradient, a glowing outline at the critical depth,
+a vertical beam and pulsing rings at every sensor with a projected data card
+(live depth, hazard class, breach time), telemetry sparklines, an alert feed, a
+plan-view minimap and a transport bar. Playback blends consecutive frames on the
+GPU, so motion is smooth between the solver's output intervals.
+
+```bash
+python -m http.server 8000
+# http://localhost:8000/viz/holo/?run=../sample_run
+# http://localhost:8000/viz/holo/?run=../ny_run&cam=2&frame=22&orbit=0
+```
+
+Keys: `space` play, `← →` step, `1 2 3` camera presets, `O` auto-orbit, `R`
+reset. Query parameters `run`, `frame`, `cam`, `orbit`. For automation
+(screenshots, tests) `window.__holo` exposes `ready`, `setFrame`, `setCamera`,
+`setAutoRotate`, `play`, `pause`.
+
+Everything drawn comes from the run folder: thresholds from `manifest.hazard`,
+sensors from `manifest.nodes`, breach times from `alerts.json`. Nothing is
+computed in the browser except the contour geometry and the flow direction,
+which is the negative water-surface gradient — the direction the local-inertial
+momentum equation pushes water. Vertical exaggeration is derived from the run's
+relief and shown in the status line, so proportions are never silently altered.
+
+`viz/holo/build_artifact.py <run_dir> <out.html>` bundles the viewer and one
+run into a single self-contained HTML fragment (run data embedded, OrbitControls
+inlined, Three.js from one pinned CDN URL) for hosting where a run folder cannot
+be served.
+
+Bloom is a small built-in pass (bright-pass, separable blur at half resolution,
+additive composite with a vignette); no post-processing modules are required
+beyond the vendored `three.module.min.js` and `OrbitControls.js`.
+
 ## Run it
 
 ```bash

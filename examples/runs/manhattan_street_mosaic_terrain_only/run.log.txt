@@ -1,0 +1,12 @@
+[nyc] tile USGS_13_n41w074.tif covers lon -74.0006..-72.9994 lat 39.9994..41.0006
+[nyc] tile USGS_13_n41w075.tif covers lon -75.0006..-73.9994 lat 39.9994..41.0006
+[nyc] grid 601x895 = 0.54M cells @ 10 m [EPSG:32618] covered 100.0%  z -13.4..57.3 m  below-sea-level cells 112200  ingest 4.1s
+[nyc] sensor '28 St (1)' at cell (280,305) z=10.76 m
+[nyc] sensor 'Times Sq-42 St' at cell (313,211) z=15.39 m
+[nyc] sensor 'Low Point 1' at cell (499,640) z=1.00 m
+[nyc] sensor 'Low Point 2' at cell (569,344) z=1.00 m
+[nyc] sensor 'Low Point 3' at cell (570,560) z=1.00 m
+[nyc] sensor 'Low Point 4' at cell (264,802) z=1.00 m
+[nyc] solving 6 h, 24 frames, 6 sensors …
+[nyc] DONE run_id 7664097b73406bcd  peak 10.3948 m (all cells)  land peak 10.3948 m at z=1.5 m  frames 25  solve 23.5 min -> /tmp/claude-0/-home-user-aqua-sim/3501f8ed-2621-5156-b327-4da2a46d8730/scratchpad/nyc_data/runs/manhattan_street_mosaic_terrain_only
+EXIT=0 wall=1424.7s peak_rss_MiB=346 user=1347s

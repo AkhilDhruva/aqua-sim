@@ -137,6 +137,77 @@ def build_scenario_from_dem(
 
 #: Five-borough New York City bounding box (WGS84): Staten Island to the Bronx.
 NYC_METRO_BBOX = (-74.26, 40.49, -73.70, 40.92)
+#: Complete New York area: Staten Island west edge to the eastern limit of USGS
+#: 1/3-arcsec coverage on Long Island (the outer forks past -72.0 have no staged
+#: tile). Covers all five boroughs + Nassau + most of Suffolk.
+NY_AREA_BBOX = (-74.28, 40.49, -72.00, 41.20)
+#: Manhattan + immediate waterfront.
+MANHATTAN_BBOX = (-74.03, 40.68, -73.90, 40.88)
+
+#: Named areas: bbox, a sensible screening cell size, and a label. Anything
+#: finer than ~10 m turns building footprints into no-flow walls (see
+#: ingestion.buildings.CLOSED_CELL_MAX_DX_M).
+AREAS = {
+    "ny": {"bbox": NY_AREA_BBOX, "dx": 250.0,
+           "label": "New York area — Staten Island to Long Island"},
+    "metro": {"bbox": NYC_METRO_BBOX, "dx": 120.0,
+              "label": "New York City metro (five boroughs)"},
+    "manhattan": {"bbox": MANHATTAN_BBOX, "dx": 20.0,
+                  "label": "Manhattan"},
+}
+
+
+def build_area_scenario(
+    area: str,
+    dem_paths: list[str],
+    target_dx_m: float | None = None,
+    storm: StormConfig | None = None,
+    nodes: list[SinkNode] | None = None,
+    node_count: int = 8,
+    max_cells: int = 4_000_000,
+    output_frames: int = 24,
+    sim_hours: float = 6.0,
+    buildings_path: str | None = None,
+    buildings_transport_url: str | None = None,
+) -> Scenario:
+    """Build a scenario for a named :data:`AREAS` region from real DEM tiles.
+
+    One reproducible entry point for every scale we run: mosaics the tiles,
+    clips to the area, optionally integrates official building footprints
+    (closed no-flow cells at ≤10 m, coverage-only above — see
+    ``ingestion.buildings.apply_buildings``), and labels the run with its
+    resolution so screening runs are never mistaken for street-scale ones.
+    """
+    from aqua_sim.ingestion.dem import DEMSource
+
+    if area not in AREAS:
+        raise ValueError(f"unknown area {area!r}; choose from {sorted(AREAS)}")
+    spec = AREAS[area]
+    dx = target_dx_m if target_dx_m is not None else spec["dx"]
+    grid = DEMSource(dem_paths, target_dx_m=dx, aoi_bounds=spec["bbox"],
+                     max_cells=max_cells).load()
+
+    if buildings_path:
+        from aqua_sim.ingestion.buildings import BuildingsSource, apply_buildings
+        coll = BuildingsSource(buildings_path,
+                               transport_url=buildings_transport_url
+                               ).load_for_grid(grid, aoi_bounds=spec["bbox"])
+        apply_buildings(grid, coll)
+
+    if nodes is None:
+        nodes = _auto_sink_nodes(grid, count=node_count)
+    storm = storm or StormConfig(rainfall_mm_per_hr=80.0, duration_hours=2.0,
+                                 drainage_capacity_mm_per_hr=44.0,
+                                 drainage_blockage=0.5)
+    total_s = sim_hours * 3600.0
+    scale = "street" if dx <= 10.0 else "screening"
+    config = SimConfig(
+        storm=storm,
+        solver=SolverConfig(cfl=0.7, total_time_s=total_s,
+                            output_interval_s=total_s / output_frames),
+        aoi_name=f"{spec['label']} — {scale} resolution {dx:.0f} m",
+    )
+    return Scenario(grid=grid, config=config, nodes=nodes)
 
 
 def build_nyc_metro_scenario(
