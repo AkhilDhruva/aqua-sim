@@ -1,0 +1,128 @@
+[
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "Franklin St (1)",
+    "message": "Breach detected at Franklin St (1). Est. full inundation in ~18 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "Canal St (J/N/Q/R/W/Z/6)",
+    "message": "Breach detected at Canal St (J/N/Q/R/W/Z/6). Est. full inundation in ~10 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "Houston St (1)",
+    "message": "Breach detected at Houston St (1). Est. full inundation in ~5 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "W 4 St-Washington Sq",
+    "message": "Breach detected at W 4 St-Washington Sq. Est. full inundation in ~16 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "2 Av (F)",
+    "message": "Breach detected at 2 Av (F). Est. full inundation in ~4 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "Delancey St-Essex St",
+    "message": "Breach detected at Delancey St-Essex St. Est. full inundation in ~10 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "CRITICAL",
+    "location": "East Broadway (F)",
+    "message": "Breach detected at East Broadway (F). Est. full inundation in ~9 min."
+  },
+  {
+    "time_s": 5400.0,
+    "severity": "CRITICAL",
+    "location": "South Ferry (1)",
+    "message": "Breach detected at South Ferry (1). Est. full inundation in ~3 min."
+  },
+  {
+    "time_s": 5400.0,
+    "severity": "CRITICAL",
+    "location": "Christopher St-Sheridan Sq (1)",
+    "message": "Breach detected at Christopher St-Sheridan Sq (1). Est. full inundation in ~14 min."
+  },
+  {
+    "time_s": 6300.0,
+    "severity": "CRITICAL",
+    "location": "Spring St (A/C/E)",
+    "message": "Breach detected at Spring St (A/C/E). Est. full inundation in ~14 min."
+  },
+  {
+    "time_s": 9900.0,
+    "severity": "CRITICAL",
+    "location": "Broadway-Lafayette St",
+    "message": "Breach detected at Broadway-Lafayette St. Est. full inundation in ~29 min."
+  },
+  {
+    "time_s": 10800.0,
+    "severity": "CRITICAL",
+    "location": "Canal St (1)",
+    "message": "Breach detected at Canal St (1). Est. full inundation in ~17 min."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "South Ferry (1)",
+    "message": "Surface water approaching critical threshold at South Ferry (1) (head -0.00 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Rector St (1)",
+    "message": "Surface water approaching critical threshold at Rector St (1) (head -0.02 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Wall St (2/3)",
+    "message": "Surface water approaching critical threshold at Wall St (2/3) (head -0.05 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "WTC Oculus / PATH",
+    "message": "Surface water approaching critical threshold at WTC Oculus / PATH (head -0.05 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Canal St (1)",
+    "message": "Surface water approaching critical threshold at Canal St (1) (head -0.02 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Spring St (A/C/E)",
+    "message": "Surface water approaching critical threshold at Spring St (A/C/E) (head -0.02 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Christopher St-Sheridan Sq (1)",
+    "message": "Surface water approaching critical threshold at Christopher St-Sheridan Sq (1) (head +0.02 m)."
+  },
+  {
+    "time_s": 4500.0,
+    "severity": "WARNING",
+    "location": "Broadway-Lafayette St",
+    "message": "Surface water approaching critical threshold at Broadway-Lafayette St (head -0.04 m)."
+  },
+  {
+    "time_s": 5400.0,
+    "severity": "WARNING",
+    "location": "domain",
+    "message": "Peak surface-flow hazard reached EXTREME (depth\u00d7velocity rating) at t=90 min."
+  }
+]

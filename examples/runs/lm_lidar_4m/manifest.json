@@ -1,0 +1,442 @@
+{
+  "format_version": "2.0",
+  "run_id": "9dedd1c40dc9770d",
+  "aoi": "Lower Manhattan (Battery to 14th St) \u2014 street resolution 4 m \u2014 Ida 2021 hyetograph \u2014 USGS LiDAR building massing as no-flow walls",
+  "grid": {
+    "nx": 1154,
+    "ny": 1234,
+    "dx_m": 4.0,
+    "crs": "EPSG:26918"
+  },
+  "units": {
+    "elevation": "m",
+    "depth": "m",
+    "velocity": "m/s",
+    "time": "s"
+  },
+  "time_axis_s": [
+    0.0,
+    900.0,
+    1800.0,
+    2700.0,
+    3600.0,
+    4500.0,
+    5400.0,
+    6300.0,
+    7200.0,
+    8100.0,
+    9000.0,
+    9900.0,
+    10800.0,
+    11700.0,
+    12600.0,
+    13500.0,
+    14400.0,
+    15300.0,
+    16200.0,
+    17100.0,
+    18000.0,
+    18900.0,
+    19800.0,
+    20700.0,
+    21600.0
+  ],
+  "frame_count": 25,
+  "peak_depth_m": 4.051,
+  "hazard": {
+    "debris_factor": 0.5,
+    "hr_bands": {
+      "low": 0.75,
+      "moderate": 1.25,
+      "significant": 2.0
+    },
+    "depth_critical_m": 0.5
+  },
+  "provenance": {
+    "terrain_source": "DEMSource",
+    "terrain_digest": "88c4785c61acdfbe",
+    "resolution_m": 4.0,
+    "crs": "EPSG:26918",
+    "solver_scheme": "local_inertial",
+    "manning_representative": 0.03,
+    "storm": {
+      "rainfall_mm_per_hr": 80.0,
+      "duration_hours": 4.0,
+      "drainage_capacity_mm_per_hr": 44.0,
+      "drainage_blockage": 0.5
+    },
+    "solver": {
+      "cfl": 0.7,
+      "total_time_s": 21600.0,
+      "output_interval_s": 900.0,
+      "backend": "NumpyShallowWaterSolver"
+    },
+    "terrain_meta": {
+      "source": "DEMSource",
+      "source_path": [
+        "/tmp/claude-0/-home-user-aqua-sim/1855ab2d-cbfc-58c7-b1fd-3f69b3533705/scratchpad/dem1m/USGS_one_meter_x58y451_NY_CMPG_2013.tif",
+        "/tmp/claude-0/-home-user-aqua-sim/1855ab2d-cbfc-58c7-b1fd-3f69b3533705/scratchpad/dem1m/USGS_one_meter_x58y452_NY_CMPG_2013.tif"
+      ],
+      "resolution_m": 4.0,
+      "target_crs": "EPSG:26918",
+      "wgs84_bounds": [
+        -74.05387751232661,
+        40.64589562060653,
+        -73.9326024551188,
+        40.82718288006805
+      ],
+      "aoi_bounds": [
+        -74.022,
+        40.698,
+        -73.968,
+        40.742
+      ],
+      "note": "reprojected to metric UTM; bare-earth DEM used as flow surface",
+      "resampling": "average",
+      "buildings": {
+        "name": "USGS 3DEP LiDAR Point Cloud \u2014 New York City (NY_NewYorkCity)",
+        "ept_url": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/NY_NewYorkCity/ept.json",
+        "acquisition": "2013-08 to 2014-04 (point GPS times)",
+        "companion_dtm": "USGS 3DEP 1 m DEM, project NY_CMPG_2013 (same acquisition)",
+        "license": "USGS 3DEP \u2014 public domain",
+        "native_crs": "EPSG:3857 horizontal (EPT reprojection of EPSG:26918), NAVD88 heights (m)",
+        "classification_note": "This survey leaves buildings and vegetation together in class 1 (unclassified); buildings are separated geometrically, see aqua_sim.ingestion.lidar.detect_buildings.",
+        "dem_sha256": {
+          "USGS_one_meter_x58y451_NY_CMPG_2013.tif": "212a8b14b1f2b4976c88f8bcd7f54f6b8d12e202856c89e6ffe49f91173d1aaa",
+          "USGS_one_meter_x58y452_NY_CMPG_2013.tif": "5d7d24e5ed9c5d74c856b3e12cb2c264cbd837645a0edbab279715da34950fb8"
+        },
+        "fetch_manifest_sha256": "f0baf957d1a26298c1b83b17882dfb7de61041f2fa6b394d9c76fd031cd1ee2b",
+        "method": "LiDAR nDSM (max above-ground return - DTM), canopy/vehicle/noise filtered, nested height-band polygons",
+        "raster_res_m": 1.0,
+        "crs": "EPSG:26918",
+        "bounds": [
+          582571.7904555311,
+          4505692.9340061415,
+          587188.4390869557,
+          4510629.42029378
+        ],
+        "points_read": 136330902,
+        "points_used": 48404406,
+        "laz_files": 3359,
+        "dem_paths": [
+          "USGS_one_meter_x58y451_NY_CMPG_2013.tif",
+          "USGS_one_meter_x58y452_NY_CMPG_2013.tif"
+        ],
+        "detection": {
+          "candidates": 6174986,
+          "regions_raw": 3386,
+          "seen_through_cells": 411667,
+          "elevated_corridor_cells": 440647,
+          "dropped_small": 1443,
+          "dropped_over_water": 0,
+          "despeckled_cells": 434107,
+          "regions": 1943,
+          "building_cells": 5921624,
+          "building_area_m2": 5921624.0
+        },
+        "parts": 17386,
+        "parameters": {
+          "band_m": 3.0
+        },
+        "caveat": "buildings as of the survey date (2013-2014)",
+        "elevated_lines": {
+          "file": "elevated_lm.geojson",
+          "sha256": "5cb99882b9d777215123ff5f8d75e6217ea764d2691518a0d147b60df32d02a2",
+          "dataset": "Overture Maps \u2014 transportation/segment",
+          "release": "2026-10-21.0",
+          "url": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=transportation/type=segment/",
+          "license": "ODbL (OpenStreetMap contributors) via Overture Maps Foundation",
+          "bbox_wgs84": [
+            -74.022,
+            40.698,
+            -73.968,
+            40.742
+          ],
+          "segments_scanned": 14868,
+          "fetched_utc": "2026-10-21T22:27:10+00:00",
+          "skipped_closed_footway_loops": 0,
+          "skipped_unnamed_footway_or_service": 188,
+          "rule": "is_bridge or level>=1 (whole or linear-referenced), excluding tunnels/indoor and unnamed footway/service segments"
+        },
+        "integration": {
+          "mode": "closed_cells",
+          "dx_m": 4.0,
+          "closed_cells": 377490,
+          "closed_threshold": 0.5,
+          "buildings": 17386,
+          "mean_coverage": 0.260854
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "name": "South Ferry (1)",
+      "x": 211,
+      "y": 1116,
+      "threshold_elevation": 0.548
+    },
+    {
+      "name": "Rector St (1)",
+      "x": 174,
+      "y": 949,
+      "threshold_elevation": 2.276
+    },
+    {
+      "name": "Wall St (2/3)",
+      "x": 256,
+      "y": 1010,
+      "threshold_elevation": 4.543
+    },
+    {
+      "name": "WTC Oculus / PATH",
+      "x": 234,
+      "y": 855,
+      "threshold_elevation": -0.944
+    },
+    {
+      "name": "Franklin St (1)",
+      "x": 303,
+      "y": 651,
+      "threshold_elevation": 0.88
+    },
+    {
+      "name": "Canal St (1)",
+      "x": 319,
+      "y": 539,
+      "threshold_elevation": 1.121
+    },
+    {
+      "name": "Canal St (J/N/Q/R/W/Z/6)",
+      "x": 474,
+      "y": 658,
+      "threshold_elevation": 2.716
+    },
+    {
+      "name": "Houston St (1)",
+      "x": 353,
+      "y": 368,
+      "threshold_elevation": 3.018
+    },
+    {
+      "name": "Spring St (A/C/E)",
+      "x": 391,
+      "y": 462,
+      "threshold_elevation": 2.359
+    },
+    {
+      "name": "Christopher St-Sheridan Sq (1)",
+      "x": 431,
+      "y": 253,
+      "threshold_elevation": 3.534
+    },
+    {
+      "name": "W 4 St-Washington Sq",
+      "x": 479,
+      "y": 277,
+      "threshold_elevation": 0.537
+    },
+    {
+      "name": "Broadway-Lafayette St",
+      "x": 590,
+      "y": 468,
+      "threshold_elevation": 10.588
+    },
+    {
+      "name": "2 Av (F)",
+      "x": 711,
+      "y": 527,
+      "threshold_elevation": 7.653
+    },
+    {
+      "name": "Delancey St-Essex St",
+      "x": 741,
+      "y": 659,
+      "threshold_elevation": 8.727
+    },
+    {
+      "name": "East Broadway (F)",
+      "x": 694,
+      "y": 790,
+      "threshold_elevation": 5.031
+    }
+  ],
+  "frames": [
+    {
+      "index": 1,
+      "file": "frame_001.json",
+      "time_s": 0.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 2,
+      "file": "frame_002.json",
+      "time_s": 900.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 3,
+      "file": "frame_003.json",
+      "time_s": 1800.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 4,
+      "file": "frame_004.json",
+      "time_s": 2700.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 5,
+      "file": "frame_005.json",
+      "time_s": 3600.0,
+      "max_depth": 0.0,
+      "breach_count": 0
+    },
+    {
+      "index": 6,
+      "file": "frame_006.json",
+      "time_s": 4500.0,
+      "max_depth": 1.469,
+      "breach_count": 7
+    },
+    {
+      "index": 7,
+      "file": "frame_007.json",
+      "time_s": 5400.0,
+      "max_depth": 3.4466,
+      "breach_count": 9
+    },
+    {
+      "index": 8,
+      "file": "frame_008.json",
+      "time_s": 6300.0,
+      "max_depth": 3.8313,
+      "breach_count": 10
+    },
+    {
+      "index": 9,
+      "file": "frame_009.json",
+      "time_s": 7200.0,
+      "max_depth": 4.051,
+      "breach_count": 10
+    },
+    {
+      "index": 10,
+      "file": "frame_010.json",
+      "time_s": 8100.0,
+      "max_depth": 4.0418,
+      "breach_count": 10
+    },
+    {
+      "index": 11,
+      "file": "frame_011.json",
+      "time_s": 9000.0,
+      "max_depth": 4.0407,
+      "breach_count": 10
+    },
+    {
+      "index": 12,
+      "file": "frame_012.json",
+      "time_s": 9900.0,
+      "max_depth": 4.0403,
+      "breach_count": 11
+    },
+    {
+      "index": 13,
+      "file": "frame_013.json",
+      "time_s": 10800.0,
+      "max_depth": 4.0406,
+      "breach_count": 12
+    },
+    {
+      "index": 14,
+      "file": "frame_014.json",
+      "time_s": 11700.0,
+      "max_depth": 4.0325,
+      "breach_count": 12
+    },
+    {
+      "index": 15,
+      "file": "frame_015.json",
+      "time_s": 12600.0,
+      "max_depth": 4.0268,
+      "breach_count": 12
+    },
+    {
+      "index": 16,
+      "file": "frame_016.json",
+      "time_s": 13500.0,
+      "max_depth": 4.0238,
+      "breach_count": 12
+    },
+    {
+      "index": 17,
+      "file": "frame_017.json",
+      "time_s": 14400.0,
+      "max_depth": 4.0207,
+      "breach_count": 12
+    },
+    {
+      "index": 18,
+      "file": "frame_018.json",
+      "time_s": 15300.0,
+      "max_depth": 4.0161,
+      "breach_count": 11
+    },
+    {
+      "index": 19,
+      "file": "frame_019.json",
+      "time_s": 16200.0,
+      "max_depth": 4.0107,
+      "breach_count": 11
+    },
+    {
+      "index": 20,
+      "file": "frame_020.json",
+      "time_s": 17100.0,
+      "max_depth": 4.0038,
+      "breach_count": 11
+    },
+    {
+      "index": 21,
+      "file": "frame_021.json",
+      "time_s": 18000.0,
+      "max_depth": 3.9982,
+      "breach_count": 10
+    },
+    {
+      "index": 22,
+      "file": "frame_022.json",
+      "time_s": 18900.0,
+      "max_depth": 3.9942,
+      "breach_count": 10
+    },
+    {
+      "index": 23,
+      "file": "frame_023.json",
+      "time_s": 19800.0,
+      "max_depth": 3.9885,
+      "breach_count": 10
+    },
+    {
+      "index": 24,
+      "file": "frame_024.json",
+      "time_s": 20700.0,
+      "max_depth": 3.9825,
+      "breach_count": 10
+    },
+    {
+      "index": 25,
+      "file": "frame_025.json",
+      "time_s": 21600.0,
+      "max_depth": 3.9773,
+      "breach_count": 10
+    }
+  ],
+  "alerts_file": "alerts.json"
+}

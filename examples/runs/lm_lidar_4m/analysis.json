@@ -1,0 +1,386 @@
+{
+ "run_id": "9dedd1c40dc9770d",
+ "aoi": "Lower Manhattan (Battery to 14th St) \u2014 street resolution 4 m \u2014 Ida 2021 hyetograph \u2014 USGS LiDAR building massing as no-flow walls",
+ "grid": {
+  "nx": 1154,
+  "ny": 1234,
+  "dx_m": 4.0,
+  "crs": "EPSG:26918"
+ },
+ "street_cells_m2": 9264480,
+ "street_peak_depth_m": 1.996,
+ "street_area_wet_over_m2": {
+  "0.05m": 2123616,
+  "0.1m": 1341152,
+  "0.3m": 431104,
+  "0.5m": 169504,
+  "1.0m": 24752
+ },
+ "street_peak_speed_m_s": 5.9,
+ "hotspots_over_0p5m_largest": [
+  {
+   "latlon": [
+    40.72237,
+    -74.00365
+   ],
+   "area_m2": 26768,
+   "max_depth_m": 2.0,
+   "time_of_peak_min": 210,
+   "ground_z_m": 1.05
+  },
+  {
+   "latlon": [
+    40.73254,
+    -74.00047
+   ],
+   "area_m2": 17904,
+   "max_depth_m": 1.67,
+   "time_of_peak_min": 195,
+   "ground_z_m": 4.46
+  },
+  {
+   "latlon": [
+    40.72905,
+    -74.00545
+   ],
+   "area_m2": 11168,
+   "max_depth_m": 1.84,
+   "time_of_peak_min": 270,
+   "ground_z_m": 2.97
+  },
+  {
+   "latlon": [
+    40.71633,
+    -73.97604
+   ],
+   "area_m2": 5264,
+   "max_depth_m": 0.86,
+   "time_of_peak_min": 165,
+   "ground_z_m": 1.74
+  },
+  {
+   "latlon": [
+    40.71073,
+    -74.00345
+   ],
+   "area_m2": 5104,
+   "max_depth_m": 1.19,
+   "time_of_peak_min": 225,
+   "ground_z_m": 3.28
+  },
+  {
+   "latlon": [
+    40.71424,
+    -73.97692
+   ],
+   "area_m2": 4336,
+   "max_depth_m": 0.9,
+   "time_of_peak_min": 165,
+   "ground_z_m": 1.7
+  },
+  {
+   "latlon": [
+    40.71787,
+    -73.97601
+   ],
+   "area_m2": 4112,
+   "max_depth_m": 1.08,
+   "time_of_peak_min": 150,
+   "ground_z_m": 1.56
+  },
+  {
+   "latlon": [
+    40.73657,
+    -73.97573
+   ],
+   "area_m2": 3584,
+   "max_depth_m": 1.18,
+   "time_of_peak_min": 150,
+   "ground_z_m": 1.11
+  },
+  {
+   "latlon": [
+    40.71558,
+    -73.97742
+   ],
+   "area_m2": 2672,
+   "max_depth_m": 0.84,
+   "time_of_peak_min": 165,
+   "ground_z_m": 1.77
+  },
+  {
+   "latlon": [
+    40.7368,
+    -73.97653
+   ],
+   "area_m2": 2304,
+   "max_depth_m": 1.34,
+   "time_of_peak_min": 150,
+   "ground_z_m": 0.95
+  },
+  {
+   "latlon": [
+    40.7391,
+    -74.00975
+   ],
+   "area_m2": 2160,
+   "max_depth_m": 1.04,
+   "time_of_peak_min": 180,
+   "ground_z_m": 1.28
+  },
+  {
+   "latlon": [
+    40.73076,
+    -73.97392
+   ],
+   "area_m2": 1984,
+   "max_depth_m": 0.69,
+   "time_of_peak_min": 150,
+   "ground_z_m": 1.51
+  }
+ ],
+ "hotspot_count_over_200m2": 83,
+ "pits_excluded": {
+  "count": 439,
+  "deepest": [
+   {
+    "latlon": [
+     40.71514,
+     -74.00489
+    ],
+    "area_m2": 1440,
+    "max_depth_m": 4.05
+   },
+   {
+    "latlon": [
+     40.71365,
+     -74.00388
+    ],
+    "area_m2": 192,
+    "max_depth_m": 4.04
+   },
+   {
+    "latlon": [
+     40.73789,
+     -73.9822
+    ],
+    "area_m2": 416,
+    "max_depth_m": 3.88
+   },
+   {
+    "latlon": [
+     40.73576,
+     -73.9935
+    ],
+    "area_m2": 80,
+    "max_depth_m": 3.87
+   },
+   {
+    "latlon": [
+     40.71363,
+     -74.0017
+    ],
+    "area_m2": 480,
+    "max_depth_m": 3.78
+   }
+  ],
+  "rule": "closed depressions >= 1.5 m below 15 m surroundings that held > 1 m"
+ },
+ "stations": [
+  {
+   "name": "South Ferry (1)",
+   "probe_latlon": [
+    40.70216,
+    -74.01257
+   ],
+   "ground_z_m": 0.5,
+   "probe_in_pit": true,
+   "probe_peak_depth_m": 1.637,
+   "street_within_50m_median_peak_m": 0.043,
+   "street_within_50m_p90_peak_m": 0.336,
+   "breach_min": 90
+  },
+  {
+   "name": "Rector St (1)",
+   "probe_latlon": [
+    40.70819,
+    -74.01423
+   ],
+   "ground_z_m": 2.23,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.063,
+   "street_within_50m_median_peak_m": 0.033,
+   "street_within_50m_p90_peak_m": 0.193,
+   "breach_min": null
+  },
+  {
+   "name": "Wall St (2/3)",
+   "probe_latlon": [
+    40.70596,
+    -74.01038
+   ],
+   "ground_z_m": 4.49,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.001,
+   "street_within_50m_median_peak_m": 0.002,
+   "street_within_50m_p90_peak_m": 0.148,
+   "breach_min": null
+  },
+  {
+   "name": "WTC Oculus / PATH",
+   "probe_latlon": [
+    40.71155,
+    -74.01134
+   ],
+   "ground_z_m": -0.99,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.001,
+   "street_within_50m_median_peak_m": 0.002,
+   "street_within_50m_p90_peak_m": 0.013,
+   "breach_min": null
+  },
+  {
+   "name": "Franklin St (1)",
+   "probe_latlon": [
+    40.71887,
+    -74.00796
+   ],
+   "ground_z_m": 0.83,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.356,
+   "street_within_50m_median_peak_m": 0.004,
+   "street_within_50m_p90_peak_m": 0.23,
+   "breach_min": 75
+  },
+  {
+   "name": "Canal St (1)",
+   "probe_latlon": [
+    40.7229,
+    -74.00715
+   ],
+   "ground_z_m": 1.07,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.171,
+   "street_within_50m_median_peak_m": 0.042,
+   "street_within_50m_p90_peak_m": 0.204,
+   "breach_min": 180
+  },
+  {
+   "name": "Canal St (J/N/Q/R/W/Z/6)",
+   "probe_latlon": [
+    40.71855,
+    -73.99987
+   ],
+   "ground_z_m": 2.67,
+   "probe_in_pit": true,
+   "probe_peak_depth_m": 2.305,
+   "street_within_50m_median_peak_m": 0.121,
+   "street_within_50m_p90_peak_m": 0.308,
+   "breach_min": 75
+  },
+  {
+   "name": "Houston St (1)",
+   "probe_latlon": [
+    40.72905,
+    -74.00545
+   ],
+   "ground_z_m": 2.97,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 1.844,
+   "street_within_50m_median_peak_m": 0.9,
+   "street_within_50m_p90_peak_m": 1.201,
+   "breach_min": 75
+  },
+  {
+   "name": "Spring St (A/C/E)",
+   "probe_latlon": [
+    40.72565,
+    -74.0037
+   ],
+   "ground_z_m": 2.31,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.479,
+   "street_within_50m_median_peak_m": 0.002,
+   "street_within_50m_p90_peak_m": 0.142,
+   "breach_min": 105
+  },
+  {
+   "name": "Christopher St-Sheridan Sq (1)",
+   "probe_latlon": [
+    40.73316,
+    -74.00169
+   ],
+   "ground_z_m": 3.48,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.337,
+   "street_within_50m_median_peak_m": 0.076,
+   "street_within_50m_p90_peak_m": 0.63,
+   "breach_min": 90
+  },
+  {
+   "name": "W 4 St-Washington Sq",
+   "probe_latlon": [
+    40.73228,
+    -73.99943
+   ],
+   "ground_z_m": 0.49,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.501,
+   "street_within_50m_median_peak_m": 0.408,
+   "street_within_50m_p90_peak_m": 0.824,
+   "breach_min": 75
+  },
+  {
+   "name": "Broadway-Lafayette St",
+   "probe_latlon": [
+    40.72535,
+    -73.99428
+   ],
+   "ground_z_m": 10.54,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.076,
+   "street_within_50m_median_peak_m": 0.008,
+   "street_within_50m_p90_peak_m": 0.076,
+   "breach_min": 165
+  },
+  {
+   "name": "2 Av (F)",
+   "probe_latlon": [
+    40.72317,
+    -73.98858
+   ],
+   "ground_z_m": 7.6,
+   "probe_in_pit": true,
+   "probe_peak_depth_m": 3.072,
+   "street_within_50m_median_peak_m": 0.011,
+   "street_within_50m_p90_peak_m": 0.109,
+   "breach_min": 75
+  },
+  {
+   "name": "Delancey St-Essex St",
+   "probe_latlon": [
+    40.71841,
+    -73.98723
+   ],
+   "ground_z_m": 8.68,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.342,
+   "street_within_50m_median_peak_m": 0.026,
+   "street_within_50m_p90_peak_m": 0.124,
+   "breach_min": 75
+  },
+  {
+   "name": "East Broadway (F)",
+   "probe_latlon": [
+    40.71371,
+    -73.98953
+   ],
+   "ground_z_m": 4.98,
+   "probe_in_pit": false,
+   "probe_peak_depth_m": 0.743,
+   "street_within_50m_median_peak_m": 0.003,
+   "street_within_50m_p90_peak_m": 0.056,
+   "breach_min": 75
+  }
+ ]
+}
