@@ -295,16 +295,52 @@ class NumpyShallowWaterSolver:
         return cfl_timestep(self.dx, self._max_h, self._max_face_v,
                             cfl=self.config.solver.cfl)
 
-    def run(self, initial_depth: Optional[Matrix] = None) -> Iterator[FlowState]:
-        """Identical driving loop to the reference solver."""
+    # -- checkpointing ---------------------------------------------------------
+
+    def state_dict(self) -> dict:
+        """Everything ``step`` carries between calls, for exact resumption."""
+        d = {"h": self.h, "qx": self.qx, "qy": self.qy, "time_s": self.time_s,
+             "max_h": self._max_h, "max_face_v": self._max_face_v}
+        if self._cum_infil is not None:
+            d["cum_infil"] = self._cum_infil
+        return d
+
+    def load_state(self, d: dict) -> None:
+        """Restore a ``state_dict``; the next ``run(resume=True)`` continues
+        bit-identically to an uninterrupted run."""
+        np = self.np
+        for key, shape in (("h", self.h.shape), ("qx", self.qx.shape), ("qy", self.qy.shape)):
+            if tuple(np.shape(d[key])) != tuple(shape):
+                raise ValueError(f"checkpoint {key} shape {np.shape(d[key])} != solver {shape}")
+        self.h = np.array(d["h"], dtype=np.float64)
+        self.qx = np.array(d["qx"], dtype=np.float64)
+        self.qy = np.array(d["qy"], dtype=np.float64)
+        self.time_s = float(d["time_s"])
+        self._max_h = float(d["max_h"])
+        self._max_face_v = float(d["max_face_v"])
+        if self._cum_infil is not None:
+            self._cum_infil = np.array(d["cum_infil"], dtype=np.float64)
+
+    def run(self, initial_depth: Optional[Matrix] = None,
+            resume: bool = False) -> Iterator[FlowState]:
+        """Identical driving loop to the reference solver.
+
+        ``resume=True`` continues from a state restored with ``load_state``:
+        the frame at the restored time was already emitted, so it is not
+        yielded again, and the output schedule is rebuilt by the same
+        repeated addition the uninterrupted loop performs."""
         if initial_depth is not None:
             self.set_initial_depth(initial_depth)
 
         solver_cfg = self.config.solver
-        yield self._snapshot()
+        next_out = solver_cfg.output_interval_s
+        if resume:
+            while next_out <= self.time_s + 1e-9:
+                next_out += solver_cfg.output_interval_s
+        else:
+            yield self._snapshot()
         last_yield_t = self.time_s
 
-        next_out = solver_cfg.output_interval_s
         guard = 0
         max_steps = 5_000_000
         while self.time_s < solver_cfg.total_time_s and guard < max_steps:

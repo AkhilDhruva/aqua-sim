@@ -145,6 +145,9 @@ def main():
     ap.add_argument("--resampling", default="bilinear", help="DEM resampling; 'average' when coarsening 1 m terrain")
     ap.add_argument("--max-cells", type=int, default=4_000_000)
     ap.add_argument("--area-name", default="Manhattan, Lower to Midtown")
+    ap.add_argument("--checkpoint-dir", default=None,
+                    help="save every frame and the solver state here; rerunning the same command resumes "
+                         "from the last saved frame (the finished run is identical to an uninterrupted one)")
     ap.add_argument("--stations", default=None,
                     help="JSON with a 'stations' list of [name, lat, lon]: monitored assets probed like the Ida stations")
     ap.add_argument("--water-sink-below", type=float, default=None,
@@ -252,7 +255,7 @@ def main():
 
     print(f"[nyc] solving {a.hours:g} h, {a.frames} frames, {len(nodes)} sensors …", flush=True)
     ts = time.time()
-    manifest = run_scenario(sc, a.out)
+    manifest = run_scenario(sc, a.out, checkpoint_dir=a.checkpoint_dir)
     solve_s = time.time() - ts
 
     land_peak = land_peak_depth(a.out, manifest, z, mask, min_z=a.min_node_z)

@@ -12,7 +12,10 @@ The Three.js viewer (Phase 4) is a thin telemetry dashboard over that folder.
 
 from __future__ import annotations
 
+import os
+
 import math
+from typing import Optional
 from dataclasses import dataclass
 
 from aqua_sim.config import SimConfig, SolverConfig, StormConfig
@@ -383,19 +386,107 @@ class _AlertScanner:
         return self.log.to_records()
 
 
-def run_scenario(scenario: Scenario, run_dir: str) -> dict:
+class _Checkpointer:
+    """Per-frame checkpoints so an interrupted run can resume.
+
+    ``frame_NNN.npz`` holds each emitted FlowState at full precision;
+    ``solver.npz`` holds the solver's state as of the newest frame (written
+    atomically, last). ``fingerprint.json`` ties the folder to one grid and
+    configuration, so a checkpoint is never resumed into a different run.
+    """
+
+    def __init__(self, path: str, scenario: Scenario) -> None:
+        import hashlib
+        import json
+        import numpy as np
+
+        self.path = path
+        os.makedirs(path, exist_ok=True)
+        g, c = scenario.grid, scenario.config
+        h = hashlib.sha256()
+        for field_ in (g.z, g.obstacle, g.mask, g.drainage, g.manning):
+            if field_ is not None:
+                h.update(np.ascontiguousarray(np.asarray(field_, dtype=np.float64)).tobytes())
+        self.fingerprint = {"nx": g.nx, "ny": g.ny, "dx": g.dx, "grid_sha256": h.hexdigest(),
+                            "config": repr(c), "nodes": [repr(n) for n in scenario.nodes]}
+        fp = os.path.join(path, "fingerprint.json")
+        if os.path.exists(fp):
+            with open(fp) as f:
+                if json.load(f) != self.fingerprint:
+                    raise ValueError(f"checkpoint folder {path} belongs to a different run; "
+                                     "use a fresh --checkpoint-dir")
+        else:
+            with open(fp, "w") as f:
+                json.dump(self.fingerprint, f)
+
+    def _atomic_savez(self, name: str, **arrays) -> None:
+        import numpy as np
+        tmp = os.path.join(self.path, name + ".tmp.npz")
+        np.savez_compressed(tmp, **arrays)
+        os.replace(tmp, os.path.join(self.path, name + ".npz"))
+
+    def saved(self):
+        """``(frames, solver_state)`` from the newest consistent checkpoint."""
+        import numpy as np
+        from aqua_sim.physics.swe import FlowState
+
+        sp = os.path.join(self.path, "solver.npz")
+        if not os.path.exists(sp):
+            return [], None
+        with np.load(sp) as z:
+            state = {k: z[k] for k in z.files}
+        n = int(state.pop("frame"))
+        frames = []
+        for i in range(1, n + 1):
+            with np.load(os.path.join(self.path, f"frame_{i:03d}.npz")) as z:
+                frames.append(FlowState(float(z["time_s"]), z["depth"].tolist(), z["speed"].tolist(),
+                                        float(z["max_depth"]), float(z["max_speed"]),
+                                        float(z["total_volume_m3"])))
+        return frames, state
+
+    def save(self, n: int, state, solver) -> None:
+        import numpy as np
+        self._atomic_savez(f"frame_{n:03d}", time_s=state.time_s, depth=np.asarray(state.depth),
+                           speed=np.asarray(state.speed), max_depth=state.max_depth,
+                           max_speed=state.max_speed, total_volume_m3=state.total_volume_m3)
+        sd = solver.state_dict()
+        self._atomic_savez("solver", frame=n, **sd)
+
+
+def run_scenario(scenario: Scenario, run_dir: str,
+                 checkpoint_dir: Optional[str] = None) -> dict:
     """Run the solver, evaluate alerts, and write the run folder. Returns manifest.
 
     Fully streaming: each frame is risk-scanned and written as the solver yields
     it, so memory stays O(one frame) regardless of run length or grid size.
+
+    ``checkpoint_dir`` makes the run resumable (NumPy backend): every frame and
+    the solver state are saved as they are produced, and a later call with the
+    same folder replays the saved frames through the same alert scan and
+    export, then continues the solver from the last one. The finished run
+    folder is identical to an uninterrupted run's.
     """
     from aqua_sim.physics.swe_numpy import make_solver
     solver = make_solver(scenario.grid, scenario.config, boundary=scenario.boundary,
                          backend=scenario.config.solver.backend)
     scanner = _AlertScanner(scenario)
+    ckpt = _Checkpointer(checkpoint_dir, scenario) if checkpoint_dir else None
+    saved, solver_state = ckpt.saved() if ckpt else ([], None)
+    if saved and not hasattr(solver, "load_state"):
+        raise ValueError("resuming from a checkpoint requires the NumPy solver backend")
+
+    def source():
+        if saved:
+            yield from saved
+            solver.load_state(solver_state)
+            yield from solver.run(resume=True)
+        else:
+            yield from solver.run()
 
     def stream():
-        for state in solver.run():
+        for n, state in enumerate(source(), start=1):
+            if ckpt is not None and n > len(saved):
+                ckpt.save(n, state, solver)
             scanner.scan(state)  # appends this frame's breaches before export reads them
             yield state
 
