@@ -449,12 +449,18 @@ class _Checkpointer:
         self._atomic_savez(f"frame_{n:03d}", time_s=state.time_s, depth=np.asarray(state.depth),
                            speed=np.asarray(state.speed), max_depth=state.max_depth,
                            max_speed=state.max_speed, total_volume_m3=state.total_volume_m3)
-        sd = solver.state_dict()
-        self._atomic_savez("solver", frame=n, **sd)
+        self.save_solver(n, solver)
+
+    def save_solver(self, n: int, solver) -> None:
+        """Solver state between frames: ``n`` frames emitted so far."""
+        import time
+        self._atomic_savez("solver", frame=n, **solver.state_dict())
+        self.last_solver_save = time.monotonic()
 
 
 def run_scenario(scenario: Scenario, run_dir: str,
-                 checkpoint_dir: Optional[str] = None) -> dict:
+                 checkpoint_dir: Optional[str] = None,
+                 checkpoint_every_s: float = 300.0) -> dict:
     """Run the solver, evaluate alerts, and write the run folder. Returns manifest.
 
     Fully streaming: each frame is risk-scanned and written as the solver yields
@@ -463,8 +469,10 @@ def run_scenario(scenario: Scenario, run_dir: str,
     ``checkpoint_dir`` makes the run resumable (NumPy backend): every frame and
     the solver state are saved as they are produced, and a later call with the
     same folder replays the saved frames through the same alert scan and
-    export, then continues the solver from the last one. The finished run
-    folder is identical to an uninterrupted run's.
+    export, then continues the solver from the last saved state. Between
+    frames the solver state is also saved every ``checkpoint_every_s`` of
+    wall time, so an interruption loses minutes, not a frame. The finished
+    run folder is identical to an uninterrupted run's.
     """
     from aqua_sim.physics.swe_numpy import make_solver
     solver = make_solver(scenario.grid, scenario.config, boundary=scenario.boundary,
@@ -475,16 +483,27 @@ def run_scenario(scenario: Scenario, run_dir: str,
     if saved and not hasattr(solver, "load_state"):
         raise ValueError("resuming from a checkpoint requires the NumPy solver backend")
 
+    emitted = [0]
+    hook = None
+    if ckpt is not None:
+        import time
+        ckpt.last_solver_save = time.monotonic()
+
+        def hook():
+            if time.monotonic() - ckpt.last_solver_save >= checkpoint_every_s:
+                ckpt.save_solver(emitted[0], solver)
+
     def source():
         if saved:
             yield from saved
             solver.load_state(solver_state)
-            yield from solver.run(resume=True)
+            yield from solver.run(resume=True, step_hook=hook)
         else:
-            yield from solver.run()
+            yield from solver.run(step_hook=hook)
 
     def stream():
         for n, state in enumerate(source(), start=1):
+            emitted[0] = n
             if ckpt is not None and n > len(saved):
                 ckpt.save(n, state, solver)
             scanner.scan(state)  # appends this frame's breaches before export reads them

@@ -75,3 +75,34 @@ def test_checkpoint_folder_refuses_a_different_run(tmp_path):
         other.config, solver=dataclasses.replace(other.config.solver, total_time_s=1200.0))
     with pytest.raises(ValueError, match="different run"):
         run_scenario(other, str(tmp_path / "b"), checkpoint_dir=ck)
+
+
+def test_resume_from_a_mid_frame_checkpoint_is_byte_identical(tmp_path, monkeypatch):
+    """Solver state saved between frames (checkpoint_every_s=0 saves after
+    every step); crash partway through frame 6, resume, compare."""
+    ref = str(tmp_path / "ref")
+    run_scenario(make_scenario(), ref)
+
+    ck = str(tmp_path / "ck")
+    out = str(tmp_path / "out")
+    real_save_solver = scenario_mod._Checkpointer.save_solver
+    calls = {"n": 0}
+
+    def save_then_maybe_crash(self, n, solver):
+        real_save_solver(self, n, solver)
+        if n == 5:
+            calls["n"] += 1
+            if calls["n"] == 7:      # a few steps into the frame after frame 5
+                raise RuntimeError("container restarted")
+
+    monkeypatch.setattr(scenario_mod._Checkpointer, "save_solver", save_then_maybe_crash)
+    with pytest.raises(RuntimeError, match="container restarted"):
+        run_scenario(make_scenario(), out, checkpoint_dir=ck, checkpoint_every_s=0.0)
+    monkeypatch.setattr(scenario_mod._Checkpointer, "save_solver", real_save_solver)
+
+    import numpy as _np
+    with _np.load(os.path.join(ck, "solver.npz")) as z:
+        assert int(z["frame"]) == 5 and float(z["time_s"]) > 1200.0   # mid-way to frame 6
+
+    run_scenario(make_scenario(), out, checkpoint_dir=ck)
+    assert read_all(out) == read_all(ref)

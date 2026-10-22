@@ -322,13 +322,16 @@ class NumpyShallowWaterSolver:
             self._cum_infil = np.array(d["cum_infil"], dtype=np.float64)
 
     def run(self, initial_depth: Optional[Matrix] = None,
-            resume: bool = False) -> Iterator[FlowState]:
+            resume: bool = False, step_hook=None) -> Iterator[FlowState]:
         """Identical driving loop to the reference solver.
 
         ``resume=True`` continues from a state restored with ``load_state``:
         the frame at the restored time was already emitted, so it is not
         yielded again, and the output schedule is rebuilt by the same
-        repeated addition the uninterrupted loop performs."""
+        repeated addition the uninterrupted loop performs. ``step_hook``, if
+        given, is called after every step (used for mid-frame checkpoints;
+        a state saved there resumes exactly, since the restored state fixes
+        every later timestep)."""
         if initial_depth is not None:
             self.set_initial_depth(initial_depth)
 
@@ -350,6 +353,8 @@ class NumpyShallowWaterSolver:
             if dt <= 0:
                 break
             self.step(dt)
+            if step_hook is not None:
+                step_hook()
             if self.time_s >= next_out - 1e-9:
                 yield self._snapshot()
                 last_yield_t = self.time_s
