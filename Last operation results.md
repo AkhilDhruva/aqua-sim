@@ -4,12 +4,48 @@
 > It is the authoritative snapshot of what exists, what runs, what is proven,
 > what is blocked, and what to do next. Update it at the end of each work session.
 
-- **Branch:** `claude/flood-simulator-planning-myqfs0` (clean, pushed)
-- **Head commit at checkpoint:** `2c5d514` — *Viewer: cap breach banners, constant-size sensor markers*
-- **Tests:** **77 passing** (`pytest`), ~40 s
-- **Status:** paused mid-project at the user's request. No work in flight (a
-  background data hunt and a scheduled wake-up were both stopped — see
-  §7 *Next steps*).
+- **Branch:** `data/nyc-footprints-2026-10` (pushed; contains all of `claude/flood-simulator-planning-myqfs0`)
+- **Tests:** **87 passing** (`pytest`), about 60 s
+- **Status:** Lower Manhattan replica built and simulated (section 0). No work in flight.
+
+---
+
+## 0. Latest session (2026-10-21/22): Lower Manhattan replica
+
+The user asked for an exact replica of New York, starting with Lower Manhattan
+and prioritizing flood accuracy. The official city hosts are still blocked, so
+everything below comes from reachable public sources.
+
+- **Terrain:** USGS 3DEP **1 m** bare-earth DEM, project `NY_CMPG_2013`, tiles
+  `x58y451` and `x58y452`, on `prd-tnm.s3.amazonaws.com`.
+- **Buildings:** derived from the city's 2013–2014 LiDAR, hosted by USGS as
+  Entwine Point Tiles (`usgs-lidar-public/NY_NewYorkCity`). The new module
+  `ingestion/lidar.py` produces 1 m roof shapes with real setbacks. The result
+  is `examples/data/lm_lidar_buildings.geojson.gz`, with 1,943 building regions
+  and 17,386 level parts. Tower heights match published figures within a few meters.
+- **Survey quirks learned:** class 17 in this survey is flight-line overlap,
+  not bridge deck, and buildings and trees share class 1. Elevated decks are
+  kept out of the walls in three ways: hydro-flattened water, ground seen
+  through a deck, and Overture/OSM bridge and viaduct lines
+  (`examples/fetch_overture_bridges.py`).
+- **Run:** `examples/runs/lm_lidar_4m/`, run `9dedd1c40dc9770d`. It covers
+  Battery to 14th St at 4 m with the Ida hyetograph, rivers as an absorbing
+  sink, and 15 subway stations as sensors. Its README holds results and limits.
+- **Resumable runs:** containers here restart about every 45–60 minutes.
+  `run_scenario(checkpoint_dir=...)` and `--checkpoint-dir` save every frame
+  and the solver state every 5 minutes. A resume is byte-identical, which is tested.
+- **Viewer:** `viz/decimate_run.py` writes a browser-sized copy. The 8 m copy
+  of this run loads in the dashboard in about 40 s with no console errors.
+
+Next steps, in priority order:
+1. **Roof rain.** Route it to the sewer load. It is currently dropped, which
+   underestimates street flooding; this is section 7 item 3, now the top accuracy gap.
+2. **Pit handling.** 2013 excavations hold 3–4 m of water and attract station
+   probes. Either fill closed depressions that are absent from current terrain,
+   or probe stations on mapped entrance points.
+3. **Official footprints.** When `data.cityofnewyork.us` is reachable, swap in
+   per-building identity. Keep the LiDAR heights.
+4. **Validation.** Extend the run north to 28 St, which is a documented Ida station.
 
 ---
 

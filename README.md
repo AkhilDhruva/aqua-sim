@@ -16,6 +16,14 @@ That file is the running checkpoint: current state, what is proven, what data is
 blocked, and the prioritized next steps. **Read it before continuing, and update
 it at the end of each session.**
 
+## Lower Manhattan replica (latest)
+
+Battery to 14th Street, from public data only: USGS 1 m terrain and 3D
+buildings derived from the city's LiDAR, with real roof setbacks. The bridges
+and the FDR viaduct are kept out of the walls. The Ida storm run is recorded in
+[`examples/runs/lm_lidar_4m`](examples/runs/lm_lidar_4m/README.md) and the
+input data in [`examples/data`](examples/data/README.md).
+
 ## Documentation (start here)
 
 - **[Last operation results.md](Last%20operation%20results.md)** — ⚑ session

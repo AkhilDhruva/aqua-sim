@@ -460,7 +460,7 @@ def make_presets(grid: Grid, anchors: list[tuple[str, float, float, float]]) -> 
         xs, ys = warp_transform("EPSG:4326", grid.crs, [lon], [lat])
         sx = (xs[0] - left) - W / 2.0
         sz = (top - ys[0]) - H / 2.0
-        if -W <= sx <= W and -H <= sz <= H:  # keep only anchors near this domain
+        if -W / 2 <= sx <= W / 2 and -H / 2 <= sz <= H / 2:  # anchors inside this domain only
             out.append({"name": name, "x": round(sx, 1), "z": round(sz, 1),
                         "dist": dist})
     return out
