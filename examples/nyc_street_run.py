@@ -76,11 +76,28 @@ def tile_coverage(paths):
     return out
 
 
+def _local_low_open(grid, x0, y0, radius):
+    """Lowest open (non-building, in-mask) cell within ``radius`` cells — a
+    station entrance is on the street, never inside a wall cell."""
+    best = None
+    for y in range(max(0, y0 - radius), min(grid.ny, y0 + radius + 1)):
+        for x in range(max(0, x0 - radius), min(grid.nx, x0 + radius + 1)):
+            if (x - x0) ** 2 + (y - y0) ** 2 > radius * radius:
+                continue
+            if not grid.mask[y][x] or grid.obstacle[y][x] > 0 or grid.z[y][x] < -1.0:
+                continue
+            if best is None or grid.z[y][x] < grid.z[best[1]][best[0]]:
+                best = (x, y)
+    return best if best is not None else (x0, y0)
+
+
 def land_low_points(grid, z, mask, count, min_z):
     """Lowest cells at or above ``min_z``, spaced like scenario._auto_sink_nodes.
 
     The engine's own helper picks the lowest in-AOI cells, which in a coastal
     metro are the rivers. These are illustrative low points, not real assets."""
+    if count <= 0:
+        return []
     ys, xs = np.nonzero(mask & (z >= min_z))
     order = np.argsort(z[ys, xs], kind="stable")
     spacing = max(grid.nx, grid.ny) // 6
@@ -128,6 +145,11 @@ def main():
     ap.add_argument("--resampling", default="bilinear", help="DEM resampling; 'average' when coarsening 1 m terrain")
     ap.add_argument("--max-cells", type=int, default=4_000_000)
     ap.add_argument("--area-name", default="Manhattan, Lower to Midtown")
+    ap.add_argument("--stations", default=None,
+                    help="JSON with a 'stations' list of [name, lat, lon]: monitored assets probed like the Ida stations")
+    ap.add_argument("--water-sink-below", type=float, default=None,
+                    help="cells with ground below this elevation (m) are open water and absorb all runoff; "
+                         "land keeps the storm's drainage rate (uses the per-cell drainage field)")
     ap.add_argument("--bbox", type=float, nargs=4, metavar=("W", "S", "E", "N"), default=DEFAULT_BBOX)
     ap.add_argument("--dx", type=float, default=10.0)
     ap.add_argument("--hours", type=float, default=6.0, help="simulated hours (rain lasts 4 h; the rest is drain-down)")
@@ -187,12 +209,32 @@ def main():
         x, y = _local_low(grid, x0, y0, radius_cells)
         nodes.append(SinkNode(name=name, x=x, y=y, threshold_elevation=grid.z[y][x] + VENT_LIP_M,
                               opening_area_m2=3.0, capacity_m3=2000.0))
+    if a.stations:
+        for name, lat, lon in json.load(open(a.stations))["stations"]:
+            if not (bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]):
+                continue
+            x0, y0 = _lonlat_to_index(grid, lon, lat)
+            x, y = _local_low_open(grid, x0, y0, radius_cells)
+            nodes.append(SinkNode(name=name, x=x, y=y, threshold_elevation=grid.z[y][x] + VENT_LIP_M,
+                                  opening_area_m2=3.0, capacity_m3=2000.0))
     for n in land_low_points(grid, z, mask, count=a.auto_nodes, min_z=a.min_node_z):
         if all(abs(n.x - m.x) + abs(n.y - m.y) > 3 for m in nodes):
             nodes.append(n)
     for n in nodes:
         print(f"[nyc] sensor {n.name!r} at cell ({n.x},{n.y}) z={grid.z[n.y][n.x]:.2f} m", flush=True)
 
+    sink_cells = 0
+    if a.water_sink_below is not None:
+        # Open water (rivers, slips) absorbs runoff: a sink far above any rain
+        # rate, so water reaching the river leaves the domain instead of
+        # filling bathymetric pits. Land keeps the storm's effective drainage.
+        drain_land = StormConfig(rainfall_mm_per_hr=80.0, duration_hours=IDA_DURATION_HOURS,
+                                 drainage_capacity_mm_per_hr=NYC_DRAINAGE_CAPACITY_MM_HR,
+                                 drainage_blockage=a.blockage).effective_drainage_m_per_s()
+        water = mask & (z < a.water_sink_below)
+        sink_cells = int(water.sum())
+        grid.drainage = np.where(water, 1.0, drain_land).tolist()
+        print(f"[nyc] open-water sink: {sink_cells} cells below {a.water_sink_below} m", flush=True)
     storm = StormConfig(rainfall_mm_per_hr=80.0, duration_hours=IDA_DURATION_HOURS,
                         drainage_capacity_mm_per_hr=NYC_DRAINAGE_CAPACITY_MM_HR,
                         drainage_blockage=a.blockage, hyetograph=IDA_HYETOGRAPH)
@@ -231,6 +273,9 @@ def main():
         "buildings_sha256": sha256(a.buildings or a.lidar_buildings) if (a.buildings or a.lidar_buildings) else None,
         "buildings_kind": "lidar_massing" if a.lidar_buildings else ("footprints" if a.buildings else None),
         "dem_resampling": a.resampling,
+        "water_sink": ({"below_m": a.water_sink_below, "cells": sink_cells, "rate_m_s": 1.0}
+                       if a.water_sink_below is not None else None),
+        "stations_file": a.stations,
         "buildings_transport_url": a.buildings_url,
         "dem": [{"path": p, "sha256": sha256(p)} for p in a.dem],
         "dem_tiles": tiles,

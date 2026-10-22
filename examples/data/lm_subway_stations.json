@@ -1,0 +1,22 @@
+{
+  "source": "Overture Maps places theme, release 2026-10-21.0 (category train_station), bbox -74.022 40.698 -73.968 40.742",
+  "selection": "Kept only places whose name identifies a current station and whose position agrees with that station; dropped demolished elevated-line stations, mislabeled entries and positions far from the station. Positions are entrance-area markers, uncertain by tens of meters; the run probes the lowest street cell within 100 m, as the Ida validation does.",
+  "role": "monitored assets (sink nodes), not validation targets: none of the documented Ida-flooded stations lie in this area",
+  "stations": [
+    ["South Ferry (1)",               40.70226, -74.01310],
+    ["Rector St (1)",                 40.70766, -74.01331],
+    ["Wall St (2/3)",                 40.70643, -74.00938],
+    ["WTC Oculus / PATH",             40.71144, -74.01123],
+    ["Franklin St (1)",               40.71901, -74.00713],
+    ["Canal St (1)",                  40.72250, -74.00611],
+    ["Canal St (J/N/Q/R/W/Z/6)",      40.71801, -74.00013],
+    ["Houston St (1)",                40.72853, -74.00550],
+    ["Spring St (A/C/E)",             40.72551, -74.00395],
+    ["Christopher St-Sheridan Sq (1)",40.73323, -74.00275],
+    ["W 4 St-Washington Sq",          40.73275, -74.00009],
+    ["Broadway-Lafayette St",         40.72591, -73.99482],
+    ["2 Av (F)",                      40.72319, -73.98907],
+    ["Delancey St-Essex St",          40.71851, -73.98835],
+    ["East Broadway (F)",             40.71415, -73.99035]
+  ]
+}
